@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Multipart, State},
+    extract::{DefaultBodyLimit, Multipart, State},
     routing::{get, post},
     Json, Router,
 };
@@ -62,6 +62,7 @@ async fn main() {
     let app = Router::new()
         .route("/health", get(|| async { "OK" }))
         .route("/upload", post(upload_handler))
+        .layer(DefaultBodyLimit::max(20 * 1024 * 1024)) // 20MB
         .with_state(shared_state);
 
     let addr = format!("0.0.0.0:{}", port);
@@ -106,23 +107,23 @@ async fn upload_handler(
     // 3. DB 저장
     let mut saved_count = 0;
     for item in &analysis_results {
-        let res = sqlx::query!(
+        let res = sqlx::query(
             r#"
-            INSERT INTO costco_items 
+            INSERT INTO costco_items
             (item_id, item_name, original_price, discount_amount, sale_price, discount_start, discount_end, price_tag_type, stock_status, image_url)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             "#,
-            item.item_id,
-            item.item_name,
-            item.original_price,
-            item.discount_amount,
-            item.sale_price,
-            item.discount_start.as_ref().map(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()).flatten(),
-            item.discount_end.as_ref().map(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()).flatten(),
-            item.price_tag_type,
-            item.stock_status,
-            file_path.to_str()
         )
+        .bind(&item.item_id)
+        .bind(&item.item_name)
+        .bind(item.original_price)
+        .bind(item.discount_amount)
+        .bind(item.sale_price)
+        .bind(item.discount_start.as_ref().and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()))
+        .bind(item.discount_end.as_ref().and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()))
+        .bind(&item.price_tag_type)
+        .bind(&item.stock_status)
+        .bind(file_path.to_str())
         .execute(&state.db)
         .await;
 
