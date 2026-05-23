@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS costco_items (
     price_tag_type VARCHAR(50), -- Normal, DoubleDiscount, Clearance
     stock_status VARCHAR(50),    -- InStock, Discontinued
     image_url TEXT,
+    uploaded_at TIMESTAMPTZ,
     reg_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
