@@ -424,7 +424,7 @@ async fn analyze_with_gemini(api_key: &str, image_data: &[u8]) -> Result<Vec<Ana
     let prompt = "You are a professional Costco price tag analyzer.
 Analyze the provided image and extract information for ALL price tags visible.
 Return a JSON array of objects with these fields:
-1. item_name: Product name (Korean and English).
+1. item_name: Product name exactly as written on the price tag in Korean. Do NOT translate or append English. Include specs shown on the name line (e.g. weight, size).
 2. item_id: 6-7 digit product number.
 3. original_price: Integer (if visible).
 4. discount_amount: Integer (if visible).
