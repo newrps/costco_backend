@@ -56,6 +56,7 @@
   table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); font-size: 0.88rem; }
   th { background: #005daa; color: white; padding: 10px 14px; text-align: left; font-weight: 600; white-space: nowrap; }
   td { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+  td:nth-child(1) { min-width: 260px; }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: #f8f9ff; }
   .price-cell { font-weight: 700; color: #c62828; white-space: nowrap; }
@@ -189,7 +190,6 @@ function renderTable(data) {
         <tr>
           <th>상품명</th>
           <th>판매가</th>
-          <th>원가</th>
           <th>할인액</th>
           <th>타입</th>
           <th>재고</th>
@@ -201,7 +201,6 @@ function renderTable(data) {
         <tr>
           <td>${item.item_name}</td>
           <td class="price-cell">${formatPrice(item.sale_price)}</td>
-          <td class="strike">${item.original_price ? formatPrice(item.original_price) : ''}</td>
           <td class="disc">${item.discount_amount ? '↓' + formatPrice(item.discount_amount) : ''}</td>
           <td>${tagBadge(item.price_tag_type, false)}</td>
           <td>${stockBadge(item.stock_status)}</td>
