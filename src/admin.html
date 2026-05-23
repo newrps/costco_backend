@@ -84,6 +84,10 @@
 
   <button class="btn btn-primary" onclick="loadItems()">조회</button>
   <input type="text" id="searchBox" placeholder="상품명 검색..." style="padding:8px 12px;border:1px solid #ccc;border-radius:6px;font-size:0.9rem;min-width:160px;">
+  <label style="display:flex;align-items:center;gap:6px;font-size:0.9rem;cursor:pointer;white-space:nowrap;">
+    <input type="checkbox" id="discountOnly" checked onchange="filterItems()" style="width:16px;height:16px;cursor:pointer;">
+    할인상품만
+  </label>
   <div style="margin-left:auto; display:flex; gap:6px;">
     <button class="btn btn-view" id="btnCard" onclick="setView('card')">카드</button>
     <button class="btn btn-view active" id="btnTable" onclick="setView('table')">표</button>
@@ -102,10 +106,11 @@ let currentData = null;
 function filterItems() {
   if (!currentData) return;
   const q = document.getElementById('searchBox').value.trim().toLowerCase();
-  const filtered = q
-    ? { ...currentData, items: currentData.items.filter(i => i.item_name.toLowerCase().includes(q)), count: 0 }
-    : currentData;
-  filtered.count = filtered.items.length;
+  const discountOnly = document.getElementById('discountOnly').checked;
+  let items = currentData.items;
+  if (discountOnly) items = items.filter(i => i.discount_amount || i.price_tag_type !== 'Normal');
+  if (q) items = items.filter(i => i.item_name.toLowerCase().includes(q));
+  const filtered = { ...currentData, items, count: items.length };
   renderItems(filtered);
 }
 
