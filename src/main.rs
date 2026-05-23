@@ -44,7 +44,6 @@ struct AnalysisResult {
 struct AppState {
     db: Pool<Postgres>,
     gemini_api_key: String,
-    paddle_ocr_url: Option<String>,
     storage_path: String,
     processed_path: String,
     inbox_path: String,
@@ -58,7 +57,6 @@ async fn main() {
 
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let gemini_api_key = std::env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY must be set");
-    let paddle_ocr_url = std::env::var("PADDLE_OCR_URL").ok();
     let storage_path = std::env::var("STORAGE_PATH").unwrap_or_else(|_| "./storage".to_string());
     let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
 
@@ -85,16 +83,9 @@ async fn main() {
         .await
         .ok();
 
-    if let Some(ref url) = paddle_ocr_url {
-        tracing::info!("PaddleOCR enabled: {}", url);
-    } else {
-        tracing::info!("PaddleOCR disabled, using Gemini vision directly");
-    }
-
     let shared_state = Arc::new(AppState {
         db: pool,
         gemini_api_key,
-        paddle_ocr_url,
         storage_path,
         processed_path,
         inbox_path: inbox_path.clone(),
@@ -320,14 +311,8 @@ async fn process_image(
         None
     };
 
-    // 이미지 분석
-    let analysis_results = if let Some(ref ocr_url) = state.paddle_ocr_url {
-        let raw_text = extract_text_with_paddle(ocr_url, &file_data).await?;
-        tracing::info!("PaddleOCR extracted: {}", &raw_text[..raw_text.len().min(200)]);
-        analyze_text_with_gemini(&state.gemini_api_key, &raw_text).await?
-    } else {
-        analyze_with_gemini(&state.gemini_api_key, &file_data).await?
-    };
+    // Gemini AI 분석
+    let analysis_results = analyze_with_gemini(&state.gemini_api_key, &file_data).await?;
 
     // DB 저장
     let mut saved_count = 0;
