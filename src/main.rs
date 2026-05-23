@@ -211,6 +211,7 @@ async fn upload_handler(
         return Json(json!({ "error": "No image uploaded" }));
     }
 
+    tracing::info!("Upload received: {} bytes, file: {}", file_data.len(), file_name);
     match process_image(&state, file_data, file_name, None).await {
         Ok((detected, saved, items)) => Json(json!({
             "status": "success",
@@ -452,9 +453,15 @@ async fn analyze_with_gemini(api_key: &str, image_data: &[u8]) -> Result<Vec<Ana
         .as_str()
         .ok_or("Invalid response from Gemini")?;
 
+    tracing::info!("Gemini raw response: {}", &text[..text.len().min(500)]);
+
     let json_str = text.trim_matches(|c| c == '`' || c == '\n' || c == ' ');
     let json_str = if json_str.starts_with("json") { &json_str[4..] } else { json_str };
 
-    let results: Vec<AnalysisResult> = serde_json::from_str(json_str)?;
+    let results: Vec<AnalysisResult> = serde_json::from_str(json_str).map_err(|e| {
+        tracing::error!("JSON parse error: {} — raw: {}", e, &json_str[..json_str.len().min(300)]);
+        e
+    })?;
+    tracing::info!("Gemini parsed {} items", results.len());
     Ok(results)
 }
