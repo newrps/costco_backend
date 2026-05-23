@@ -232,7 +232,10 @@ async fn upload_handler(
             "saved_count": saved,
             "items": items,
         })),
-        Err(e) => Json(json!({ "error": e.to_string() })),
+        Err(e) => {
+            tracing::error!("process_image failed: {}", e);
+            Json(json!({ "error": e.to_string() }))
+        }
     }
 }
 
