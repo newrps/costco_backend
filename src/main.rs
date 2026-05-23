@@ -405,7 +405,7 @@ async fn fetch_costco_image(item_id: &str) -> Option<String> {
 async fn analyze_with_gemini(api_key: &str, image_data: &[u8]) -> Result<Vec<AnalysisResult>, Box<dyn std::error::Error + Send + Sync>> {
     let base64_image = general_purpose::STANDARD.encode(image_data);
     let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={}",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={}",
         api_key
     );
 
