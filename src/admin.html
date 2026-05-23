@@ -83,7 +83,7 @@
   <button class="btn btn-nav" onclick="changeDate(-1)">◀ 전날</button>
   <button class="btn btn-nav" onclick="changeDate(1)">다음날 ▶</button>
   <button class="btn btn-primary" onclick="loadItems()">조회</button>
-  <input type="text" id="searchBox" placeholder="상품명 검색..." oninput="filterItems()" style="padding:8px 12px;border:1px solid #ccc;border-radius:6px;font-size:0.9rem;min-width:160px;">
+  <input type="text" id="searchBox" placeholder="상품명 검색..." style="padding:8px 12px;border:1px solid #ccc;border-radius:6px;font-size:0.9rem;min-width:160px;">
   <div style="margin-left:auto; display:flex; gap:6px;">
     <button class="btn btn-view" id="btnCard" onclick="setView('card')">카드</button>
     <button class="btn btn-view active" id="btnTable" onclick="setView('table')">표</button>
@@ -108,6 +108,14 @@ function filterItems() {
   filtered.count = filtered.items.length;
   renderItems(filtered);
 }
+
+(function() {
+  let composing = false;
+  const box = document.getElementById('searchBox');
+  box.addEventListener('compositionstart', () => composing = true);
+  box.addEventListener('compositionend', () => { composing = false; filterItems(); });
+  box.addEventListener('input', () => { if (!composing) filterItems(); });
+})();
 
 const TAG_INFO = {
   'Normal':          { cls: 'badge-normal',    tip: '일반 할인 (끝 두자리 .90)' },
