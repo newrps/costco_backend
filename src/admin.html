@@ -38,6 +38,7 @@
   .badge-normal    { background: #e3f0ff; color: #005daa; }
   .badge-double    { background: #fff3e0; color: #e65100; }
   .badge-clearance { background: #fce4ec; color: #c62828; }
+  .badge-mfr       { background: #f3e5f5; color: #7b1fa2; }
   .badge-instock   { background: #e8f5e9; color: #2e7d32; }
   .badge-lastchance{ background: #fff9c4; color: #f57f17; }
   .badge[data-tip]:hover::after {
@@ -117,12 +118,13 @@ function filterItems() {
 })();
 
 const TAG_INFO = {
-  'Normal':          { cls: 'badge-normal',    tip: '일반 할인 (끝 두자리 .90)' },
-  'Double Discount': { cls: 'badge-double',    tip: '이중 할인 — 추가 쿠폰/즉시할인 적용 (끝 두자리 .70)' },
-  'Clearance':       { cls: 'badge-clearance', tip: '재고 정리 — 소진 후 단종 (끝 두자리 .00)' },
+  'Normal':                { cls: 'badge-normal',    tip: '일반 정상가 (끝 두자리 .90)' },
+  'Double Discount':       { cls: 'badge-double',    tip: '매니저 특별 할인 — 재고 소진용 대폭 할인 (끝 두자리 .70 또는 .00)' },
+  'Clearance':             { cls: 'badge-clearance', tip: '재고 정리 — 소진 후 단종 (끝 두자리 .00)' },
+  'Manufacturer Discount': { cls: 'badge-mfr',       tip: '생산업체 프로모션 할인 (끝 두자리 .49 또는 .79)' },
 };
 const STOCK_INFO = {
-  'In Stock':    { cls: 'badge-instock',    tip: '+ 재입고 예정 / 일반 재고' },
+  'In Stock':    { cls: 'badge-instock',    tip: '+ 재입고 불분명 — 판매 추이에 따라 결정' },
   'Last Chance': { cls: 'badge-lastchance', tip: '* 마지막 물량 — 재주문 없이 소진 후 단종' },
   'Normal':      { cls: 'badge-instock',    tip: '일반 재고' },
 };

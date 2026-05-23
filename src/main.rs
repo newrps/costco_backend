@@ -420,7 +420,11 @@ async fn analyze_with_gemini(api_key: &str, image_data: &[u8]) -> Result<Vec<Ana
     5. sale_price: Final price as integer.
     6. discount_start: YYYY-MM-DD (if visible).
     7. discount_end: YYYY-MM-DD (if visible).
-    8. price_tag_type: 'Normal' (90), 'Double Discount' (70), 'Clearance' (00) based on last 2 digits of sale_price.
+    8. price_tag_type based on last 2 digits of sale_price:
+       - 'Normal' if ends in 90
+       - 'Double Discount' if ends in 70 or 00
+       - 'Manufacturer Discount' if ends in 49 or 79
+       - 'Normal' otherwise
     9. stock_status: '+' -> 'In Stock', '*' -> 'Last Chance', else 'Normal'.
 
     Respond ONLY with a valid JSON array. If nothing found, return [].
