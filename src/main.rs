@@ -102,7 +102,9 @@ async fn main() {
         .route("/health", get(|| async { "OK" }))
         .route("/upload", post(upload_handler))
         .route("/items", get(items_handler))
+        .route("/sale-items", get(sale_items_handler))
         .route("/admin", get(admin_page_handler))
+        .route("/sale", get(sale_page_handler))
         .layer(DefaultBodyLimit::max(20 * 1024 * 1024))
         .with_state(shared_state);
 
@@ -285,6 +287,52 @@ async fn items_handler(
 // 웹 관리 페이지
 async fn admin_page_handler() -> Html<&'static str> {
     Html(include_str!("admin.html"))
+}
+
+// 오늘의 할인 대시보드 페이지
+async fn sale_page_handler() -> Html<&'static str> {
+    Html(include_str!("sale.html"))
+}
+
+// 오늘 할인 중인 상품 API
+async fn sale_items_handler(
+    State(state): State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    let rows = sqlx::query_as::<_, (i32, String, String, Option<i32>, Option<i32>, i32, Option<String>, Option<String>, String, String, Option<String>, Option<String>)>(
+        r#"SELECT DISTINCT ON (item_id)
+                  idx, item_id, item_name, original_price, discount_amount, sale_price,
+                  discount_start::text, discount_end::text, price_tag_type, stock_status,
+                  product_image_url,
+                  uploaded_at::text
+           FROM costco_items
+           WHERE discount_amount IS NOT NULL
+             AND (discount_start IS NULL OR discount_start <= (NOW() AT TIME ZONE 'Asia/Seoul')::date)
+             AND (discount_end IS NULL OR discount_end >= (NOW() AT TIME ZONE 'Asia/Seoul')::date)
+           ORDER BY item_id, idx DESC"#,
+    )
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(items) => {
+            let list: Vec<_> = items.iter().map(|r| json!({
+                "idx": r.0,
+                "item_id": r.1,
+                "item_name": r.2,
+                "original_price": r.3,
+                "discount_amount": r.4,
+                "sale_price": r.5,
+                "discount_start": r.6,
+                "discount_end": r.7,
+                "price_tag_type": r.8,
+                "stock_status": r.9,
+                "product_image_url": r.10,
+                "uploaded_at": r.11,
+            })).collect();
+            Json(json!({ "count": list.len(), "items": list }))
+        }
+        Err(e) => Json(json!({ "error": e.to_string() })),
+    }
 }
 
 // 공통 이미지 처리 함수
