@@ -441,7 +441,7 @@ Return a JSON array of objects with these fields:
 Respond ONLY with a valid JSON array. If nothing found, return [].";
 
     let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={}",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key={}",
         api_key
     );
 
