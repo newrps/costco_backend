@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>코스트코 가격표 관리</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; }
+  header { background: #005daa; color: white; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 1.2rem; font-weight: 600; }
+  .toolbar { background: white; padding: 12px 24px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #e0e0e0; flex-wrap: wrap; }
+  .toolbar label { font-size: 0.9rem; color: #666; }
+  input[type="date"] { padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95rem; }
+  .btn { padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+  .btn-primary { background: #005daa; color: white; }
+  .btn-nav { background: #f0f0f0; color: #333; }
+  .btn-view { background: #f0f0f0; color: #555; }
+  .btn-view.active { background: #005daa; color: white; }
+  .btn:hover { opacity: 0.85; }
+  .summary { padding: 10px 24px; font-size: 0.9rem; color: #666; }
+
+  /* 카드 뷰 */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; padding: 16px 24px; }
+  .card { background: white; border-radius: 10px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .item-name { font-size: 0.95rem; font-weight: 600; line-height: 1.4; flex: 1; }
+  .prices { margin: 10px 0; }
+  .sale-price { font-size: 1.4rem; font-weight: 700; color: #c62828; }
+  .original-price { font-size: 0.85rem; color: #999; text-decoration: line-through; margin-left: 6px; }
+  .discount { font-size: 0.85rem; color: #e65100; margin-left: 4px; }
+  .meta { font-size: 0.78rem; color: #999; margin-top: 8px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+  /* 배지 + 툴팁 */
+  .badge { font-size: 0.72rem; padding: 3px 8px; border-radius: 20px; white-space: nowrap; position: relative; cursor: default; display: inline-block; }
+  .badge-normal    { background: #e3f0ff; color: #005daa; }
+  .badge-double    { background: #fff3e0; color: #e65100; }
+  .badge-clearance { background: #fce4ec; color: #c62828; }
+  .badge-instock   { background: #e8f5e9; color: #2e7d32; }
+  .badge-lastchance{ background: #fff9c4; color: #f57f17; }
+  .badge[data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+    background: #222; color: #fff; font-size: 0.75rem; padding: 5px 10px;
+    border-radius: 6px; white-space: nowrap; pointer-events: none; z-index: 100; line-height: 1.5;
+  }
+  .badge[data-tip]:hover::before {
+    content: ''; position: absolute; bottom: calc(100% + 1px); left: 50%; transform: translateX(-50%);
+    border: 5px solid transparent; border-top-color: #222; pointer-events: none; z-index: 100;
+  }
+
+  /* 테이블 뷰 */
+  .table-wrap { padding: 16px 24px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); font-size: 0.88rem; }
+  th { background: #005daa; color: white; padding: 10px 14px; text-align: left; font-weight: 600; white-space: nowrap; }
+  td { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f8f9ff; }
+  .price-cell { font-weight: 700; color: #c62828; white-space: nowrap; }
+  .strike { text-decoration: line-through; color: #aaa; font-size: 0.82rem; }
+  .disc { color: #e65100; font-size: 0.82rem; }
+
+  .empty { text-align: center; padding: 60px; color: #aaa; }
+  .empty p { margin-top: 8px; font-size: 0.9rem; }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 20px; border-radius: 8px; font-size: 0.9rem; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999; }
+  .toast.show { opacity: 1; }
+  .loading { text-align: center; padding: 60px; color: #aaa; }
+</style>
+</head>
+<body>
+
+<header>
+  <span style="font-size:1.5rem">🏷️</span>
+  <h1>코스트코 가격표 관리</h1>
+</header>
+
+<div class="toolbar">
+  <label>날짜</label>
+  <input type="date" id="datePicker">
+  <button class="btn btn-nav" onclick="changeDate(-1)">◀ 전날</button>
+  <button class="btn btn-nav" onclick="changeDate(1)">다음날 ▶</button>
+  <button class="btn btn-primary" onclick="loadItems()">조회</button>
+  <div style="margin-left:auto; display:flex; gap:6px;">
+    <button class="btn btn-view" id="btnCard" onclick="setView('card')">카드</button>
+    <button class="btn btn-view active" id="btnTable" onclick="setView('table')">표</button>
+  </div>
+</div>
+
+<div class="summary" id="summary"></div>
+<div id="content" class="loading">불러오는 중...</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const datePicker = document.getElementById('datePicker');
+let currentView = 'table';
+let currentData = null;
+
+const TAG_INFO = {
+  'Normal':          { cls: 'badge-normal',    tip: '일반 할인 (끝 두자리 .90)' },
+  'Double Discount': { cls: 'badge-double',    tip: '이중 할인 — 추가 쿠폰/즉시할인 적용 (끝 두자리 .70)' },
+  'Clearance':       { cls: 'badge-clearance', tip: '재고 정리 — 소진 후 단종 (끝 두자리 .00)' },
+};
+const STOCK_INFO = {
+  'In Stock':    { cls: 'badge-instock',    tip: '+ 재입고 예정 / 일반 재고' },
+  'Last Chance': { cls: 'badge-lastchance', tip: '* 마지막 물량 — 재주문 없이 소진 후 단종' },
+  'Normal':      { cls: 'badge-instock',    tip: '일반 재고' },
+};
+
+function tagBadge(type, ml = true) {
+  const info = TAG_INFO[type] || { cls: 'badge-normal', tip: type };
+  return `<span class="badge ${info.cls}" style="${ml?'margin-left:6px':''}" data-tip="${info.tip}">${type}</span>`;
+}
+function stockBadge(s) {
+  const info = STOCK_INFO[s] || { cls: 'badge-instock', tip: s };
+  return `<span class="badge ${info.cls}" data-tip="${info.tip}">${s}</span>`;
+}
+function formatPrice(p) {
+  return p != null ? Number(p).toLocaleString() + '원' : '';
+}
+
+function today() { return new Date().toLocaleDateString('sv-SE'); }
+
+function changeDate(delta) {
+  const d = new Date(datePicker.value || today());
+  d.setDate(d.getDate() + delta);
+  datePicker.value = d.toLocaleDateString('sv-SE');
+  loadItems();
+}
+
+function showToast(msg, duration = 3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function setView(v) {
+  currentView = v;
+  document.getElementById('btnCard').classList.toggle('active', v === 'card');
+  document.getElementById('btnTable').classList.toggle('active', v === 'table');
+  if (currentData) renderItems(currentData);
+}
+
+function renderCard(data) {
+  const content = document.getElementById('content');
+  content.className = 'grid';
+  content.innerHTML = data.items.map(item => `
+    <div class="card">
+      <div class="card-header">
+        <div class="item-name">${item.item_name}</div>
+        ${tagBadge(item.price_tag_type)}
+      </div>
+      <div class="prices">
+        <span class="sale-price">${formatPrice(item.sale_price)}</span>
+        ${item.original_price ? `<span class="original-price">${formatPrice(item.original_price)}</span>` : ''}
+        ${item.discount_amount ? `<span class="discount">↓${formatPrice(item.discount_amount)}</span>` : ''}
+      </div>
+      <div class="meta">
+        <span>🔖 ${item.item_id}</span>
+        ${stockBadge(item.stock_status)}
+        ${item.discount_start ? `<span>📅 ${item.discount_start} ~ ${item.discount_end || ''}</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderTable(data) {
+  const content = document.getElementById('content');
+  content.className = 'table-wrap';
+  content.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>상품번호</th>
+          <th>상품명</th>
+          <th>판매가</th>
+          <th>원가</th>
+          <th>할인액</th>
+          <th>타입</th>
+          <th>재고</th>
+          <th>할인기간</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.items.map(item => `
+        <tr>
+          <td>${item.item_id}</td>
+          <td>${item.item_name}</td>
+          <td class="price-cell">${formatPrice(item.sale_price)}</td>
+          <td class="strike">${item.original_price ? formatPrice(item.original_price) : ''}</td>
+          <td class="disc">${item.discount_amount ? '↓' + formatPrice(item.discount_amount) : ''}</td>
+          <td>${tagBadge(item.price_tag_type, false)}</td>
+          <td>${stockBadge(item.stock_status)}</td>
+          <td style="font-size:0.82rem;color:#888">${item.discount_start ? item.discount_start + ' ~ ' + (item.discount_end || '') : ''}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function renderItems(data) {
+  document.getElementById('summary').textContent = `${data.date} — 총 ${data.count}건 (중복 제거)`;
+  if (!data.items || data.items.length === 0) {
+    document.getElementById('content').innerHTML = '<div class="empty"><div style="font-size:2.5rem">📭</div><p>해당 날짜에 등록된 상품이 없습니다.</p></div>';
+    return;
+  }
+  if (currentView === 'table') renderTable(data);
+  else renderCard(data);
+}
+
+async function loadItems() {
+  const date = datePicker.value || today();
+  document.getElementById('content').className = 'loading';
+  document.getElementById('content').textContent = '불러오는 중...';
+  document.getElementById('summary').textContent = '';
+
+  try {
+    const res = await fetch(`/items?date=${date}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    currentData = data;
+    renderItems(data);
+    if (data.count > 0) showToast(`✅ ${data.count}건 로드됨`);
+  } catch(e) {
+    document.getElementById('content').innerHTML = `<div class="empty"><p>오류: ${e.message}</p></div>`;
+  }
+}
+
+datePicker.value = today();
+loadItems();
+setInterval(loadItems, 30000);
+</script>
+</body>
+</html>

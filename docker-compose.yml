@@ -9,8 +9,6 @@ services:
       POSTGRES_USER: newrps
       POSTGRES_PASSWORD: Pspspsps1234!!
       POSTGRES_DB: costco_db
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -25,7 +23,7 @@ services:
     container_name: costco-backend
     restart: always
     ports:
-      - "3000:3000"
+      - "3100:3000"
     env_file:
       - .env
     volumes:

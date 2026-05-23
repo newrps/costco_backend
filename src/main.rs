@@ -1,5 +1,6 @@
 use axum::{
-    extract::{DefaultBodyLimit, Multipart, State},
+    extract::{DefaultBodyLimit, Multipart, Query, State},
+    response::Html,
     routing::{get, post},
     Json, Router,
 };
@@ -82,6 +83,8 @@ async fn main() {
     let app = Router::new()
         .route("/health", get(|| async { "OK" }))
         .route("/upload", post(upload_handler))
+        .route("/items", get(items_handler))
+        .route("/admin", get(admin_page_handler))
         .layer(DefaultBodyLimit::max(20 * 1024 * 1024))
         .with_state(shared_state);
 
@@ -138,7 +141,7 @@ async fn watch_inbox_folder(state: Arc<AppState>) {
                     Ok(data) => {
                         let file_name = path.file_name().unwrap().to_string_lossy().to_string();
                         match process_image(&state, data, file_name, Some(path.clone())).await {
-                            Ok((detected, saved)) => {
+                            Ok((detected, saved, _)) => {
                                 tracing::info!(
                                     "Inbox processed (attempt {}/{}): detected={}, saved={}",
                                     attempt, MAX_RETRIES, detected, saved
@@ -204,13 +207,61 @@ async fn upload_handler(
     }
 
     match process_image(&state, file_data, file_name, None).await {
-        Ok((detected, saved)) => Json(json!({
+        Ok((detected, saved, items)) => Json(json!({
             "status": "success",
             "detected_count": detected,
             "saved_count": saved,
+            "items": items,
         })),
         Err(e) => Json(json!({ "error": e.to_string() })),
     }
+}
+
+// 날짜별 아이템 조회 API
+async fn items_handler(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<std::collections::HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let date = params.get("date").cloned()
+        .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d").to_string());
+
+    let rows = sqlx::query_as::<_, (i32, String, String, Option<i32>, Option<i32>, i32, Option<String>, Option<String>, String, String, Option<String>, Option<chrono::DateTime<chrono::Utc>>)>(
+        r#"SELECT DISTINCT ON (item_id)
+                  idx, item_id, item_name, original_price, discount_amount, sale_price,
+                  discount_start::text, discount_end::text, price_tag_type, stock_status, image_url, uploaded_at
+           FROM costco_items
+           WHERE DATE(uploaded_at AT TIME ZONE 'Asia/Seoul') = $1::date
+           ORDER BY item_id, idx DESC"#,
+    )
+    .bind(&date)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(items) => {
+            let list: Vec<_> = items.iter().map(|r| json!({
+                "idx": r.0,
+                "item_id": r.1,
+                "item_name": r.2,
+                "original_price": r.3,
+                "discount_amount": r.4,
+                "sale_price": r.5,
+                "discount_start": r.6,
+                "discount_end": r.7,
+                "price_tag_type": r.8,
+                "stock_status": r.9,
+                "image_url": r.10,
+                "uploaded_at": r.11,
+            })).collect();
+            Json(json!({ "date": date, "count": list.len(), "items": list }))
+        }
+        Err(e) => Json(json!({ "error": e.to_string() })),
+    }
+}
+
+// 웹 관리 페이지
+async fn admin_page_handler() -> Html<&'static str> {
+    Html(include_str!("admin.html"))
 }
 
 // 공통 이미지 처리 함수
@@ -220,7 +271,7 @@ async fn process_image(
     file_data: Vec<u8>,
     file_name: String,
     source_path: Option<PathBuf>,
-) -> Result<(usize, usize), Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<(usize, usize, Vec<AnalysisResult>), Box<dyn std::error::Error + Send + Sync>> {
     let uploaded_at = chrono::Utc::now();
     let date_str = uploaded_at.format("%Y-%m-%d").to_string();
 
@@ -242,12 +293,23 @@ async fn process_image(
 
     // DB 저장
     let mut saved_count = 0;
-    for item in &analysis_results {
-        let res = sqlx::query(
+    let discount_start_vals: Vec<_> = analysis_results.iter()
+        .map(|i| i.discount_start.as_ref().and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()))
+        .collect();
+    let discount_end_vals: Vec<_> = analysis_results.iter()
+        .map(|i| i.discount_end.as_ref().and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()))
+        .collect();
+
+    for (idx, item) in analysis_results.iter().enumerate() {
+        // 같은 날 같은 item_id가 있으면 UPDATE, 없으면 INSERT
+        let updated = sqlx::query(
             r#"
-            INSERT INTO costco_items
-            (item_id, item_name, original_price, discount_amount, sale_price, discount_start, discount_end, price_tag_type, stock_status, image_url, uploaded_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            UPDATE costco_items SET
+                item_name = $2, original_price = $3, discount_amount = $4, sale_price = $5,
+                discount_start = $6, discount_end = $7, price_tag_type = $8, stock_status = $9,
+                image_url = $10, uploaded_at = $11
+            WHERE item_id = $1
+              AND DATE(uploaded_at AT TIME ZONE 'Asia/Seoul') = DATE($11 AT TIME ZONE 'Asia/Seoul')
             "#,
         )
         .bind(&item.item_id)
@@ -255,8 +317,8 @@ async fn process_image(
         .bind(item.original_price)
         .bind(item.discount_amount)
         .bind(item.sale_price)
-        .bind(item.discount_start.as_ref().and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()))
-        .bind(item.discount_end.as_ref().and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()))
+        .bind(discount_start_vals[idx])
+        .bind(discount_end_vals[idx])
         .bind(&item.price_tag_type)
         .bind(&item.stock_status)
         .bind(processed_file_path.to_str())
@@ -264,9 +326,34 @@ async fn process_image(
         .execute(&state.db)
         .await;
 
-        if res.is_ok() {
-            saved_count += 1;
-        }
+        let done = match updated {
+            Ok(r) if r.rows_affected() > 0 => true,
+            _ => {
+                sqlx::query(
+                    r#"
+                    INSERT INTO costco_items
+                    (item_id, item_name, original_price, discount_amount, sale_price, discount_start, discount_end, price_tag_type, stock_status, image_url, uploaded_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                    "#,
+                )
+                .bind(&item.item_id)
+                .bind(&item.item_name)
+                .bind(item.original_price)
+                .bind(item.discount_amount)
+                .bind(item.sale_price)
+                .bind(discount_start_vals[idx])
+                .bind(discount_end_vals[idx])
+                .bind(&item.price_tag_type)
+                .bind(&item.stock_status)
+                .bind(processed_file_path.to_str())
+                .bind(uploaded_at)
+                .execute(&state.db)
+                .await
+                .is_ok()
+            }
+        };
+
+        if done { saved_count += 1; }
     }
 
     // DB 저장 성공 시 날짜 폴더로 이동
@@ -282,13 +369,13 @@ async fn process_image(
         }
     }
 
-    Ok((analysis_results.len(), saved_count))
+    Ok((analysis_results.len(), saved_count, analysis_results))
 }
 
 async fn analyze_with_gemini(api_key: &str, image_data: &[u8]) -> Result<Vec<AnalysisResult>, Box<dyn std::error::Error + Send + Sync>> {
     let base64_image = general_purpose::STANDARD.encode(image_data);
     let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={}",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={}",
         api_key
     );
 
