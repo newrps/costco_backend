@@ -15,9 +15,22 @@ use std::path::{Path, PathBuf};
 use base64::{Engine as _, engine::general_purpose};
 use serde_json::{json, Value};
 
+fn deserialize_id<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    struct V;
+    impl<'de> serde::de::Visitor<'de> for V {
+        type Value = String;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result { write!(f, "string or number") }
+        fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<String, E> { Ok(v.to_owned()) }
+        fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<String, E> { Ok(v.to_string()) }
+        fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<String, E> { Ok(v.to_string()) }
+    }
+    d.deserialize_any(V)
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct AnalysisResult {
     item_name: String,
+    #[serde(deserialize_with = "deserialize_id")]
     item_id: String,
     original_price: Option<i32>,
     discount_amount: Option<i32>,
