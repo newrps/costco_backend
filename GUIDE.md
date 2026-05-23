@@ -37,12 +37,12 @@ git 없이 NAS 배포만:
 
 ---
 
-## 2. Gemini API 키 교체
+## 2. OpenAI API 키 교체
 
-Google이 키를 차단하면 분석이 안 됨 (로그에 403/PERMISSION_DENIED 표시).
+키가 만료되거나 교체가 필요하면 로그에 `OpenAI API error` 표시.
 
 ### 새 키 발급
-[https://aistudio.google.com/apikey](https://aistudio.google.com/apikey) → **Create API key**
+[https://platform.openai.com/api-keys](https://platform.openai.com/api-keys) → **Create new secret key**
 
 ### NAS에 직접 교체 (절대 채팅/터미널에 키를 붙여넣지 말 것)
 
@@ -56,21 +56,13 @@ ssh -p 56822 newrps@192.168.123.110
 nano /volume1/docker/costco_backend/.env
 ```
 
-`GEMINI_API_KEY=` 줄을 새 키로 교체 후 저장 (`Ctrl+X` → `Y` → `Enter`)
+`OPENAI_API_KEY=` 줄을 새 키로 교체 후 저장 (`Ctrl+X` → `Y` → `Enter`)
 
 **3. 백엔드 재시작**
 ```bash
 cd /volume1/docker/costco_backend
 /usr/local/bin/docker compose restart backend
 ```
-
-### 키가 제대로 작동하는지 확인
-```bash
-curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=여기에_새_키" \
-  -H "Content-Type: application/json" \
-  -d '{"contents":[{"parts":[{"text":"hi"}]}]}' | head -5
-```
-→ `"candidates"` 가 보이면 정상, `"PERMISSION_DENIED"` 면 키 문제
 
 ---
 
@@ -188,7 +180,7 @@ nano .env
 내용:
 ```
 DATABASE_URL=postgres://newrps:Pspspsps1234!!@db:5432/costco_db
-GEMINI_API_KEY=여기에_Gemini_API_키_입력
+OPENAI_API_KEY=여기에_OpenAI_API_키_입력
 PORT=3000
 STORAGE_PATH=/app/storage
 INBOX_PATH=/app/storage/inbox

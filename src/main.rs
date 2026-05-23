@@ -311,7 +311,6 @@ async fn process_image(
         None
     };
 
-    // Gemini AI 분석
     let analysis_results = analyze_with_gemini(&state.gemini_api_key, &file_data).await?;
 
     // DB 저장
@@ -421,31 +420,30 @@ async fn fetch_costco_image(item_id: &str) -> Option<String> {
 
 async fn analyze_with_gemini(api_key: &str, image_data: &[u8]) -> Result<Vec<AnalysisResult>, Box<dyn std::error::Error + Send + Sync>> {
     let base64_image = general_purpose::STANDARD.encode(image_data);
+
+    let prompt = "You are a professional Costco price tag analyzer.
+Analyze the provided image and extract information for ALL price tags visible.
+Return a JSON array of objects with these fields:
+1. item_name: Product name (Korean and English).
+2. item_id: 6-7 digit product number.
+3. original_price: Integer (if visible).
+4. discount_amount: Integer (if visible).
+5. sale_price: Final price as integer.
+6. discount_start: YYYY-MM-DD (if visible).
+7. discount_end: YYYY-MM-DD (if visible).
+8. price_tag_type based on last 2 digits of sale_price:
+   - 'Normal' if ends in 90
+   - 'Double Discount' if ends in 70 or 00
+   - 'Manufacturer Discount' if ends in 49 or 79
+   - 'Normal' otherwise
+9. stock_status: '+' -> 'In Stock', '*' -> 'Last Chance', else 'Normal'.
+
+Respond ONLY with a valid JSON array. If nothing found, return [].";
+
     let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={}",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={}",
         api_key
     );
-
-    let prompt = "
-    You are a professional Costco price tag analyzer.
-    Analyze the provided image and extract information for ALL price tags visible.
-    Return a JSON array of objects with these fields:
-    1. item_name: Product name (Korean and English).
-    2. item_id: 6-7 digit product number.
-    3. original_price: Integer (if visible).
-    4. discount_amount: Integer (if visible).
-    5. sale_price: Final price as integer.
-    6. discount_start: YYYY-MM-DD (if visible).
-    7. discount_end: YYYY-MM-DD (if visible).
-    8. price_tag_type based on last 2 digits of sale_price:
-       - 'Normal' if ends in 90
-       - 'Double Discount' if ends in 70 or 00
-       - 'Manufacturer Discount' if ends in 49 or 79
-       - 'Normal' otherwise
-    9. stock_status: '+' -> 'In Stock', '*' -> 'Last Chance', else 'Normal'.
-
-    Respond ONLY with a valid JSON array. If nothing found, return [].
-    ";
 
     let body = json!({
         "contents": [{
