@@ -65,6 +65,11 @@ async fn main() {
         .await
         .expect("Failed to connect to Postgres");
 
+    sqlx::query("ALTER TABLE costco_items ADD COLUMN IF NOT EXISTS product_image_url TEXT")
+        .execute(&pool)
+        .await
+        .ok();
+
     let shared_state = Arc::new(AppState {
         db: pool,
         gemini_api_key,
@@ -225,10 +230,10 @@ async fn items_handler(
     let date = params.get("date").cloned()
         .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d").to_string());
 
-    let rows = sqlx::query_as::<_, (i32, String, String, Option<i32>, Option<i32>, i32, Option<String>, Option<String>, String, String, Option<String>, Option<chrono::DateTime<chrono::Utc>>)>(
+    let rows = sqlx::query_as::<_, (i32, String, String, Option<i32>, Option<i32>, i32, Option<String>, Option<String>, String, String, Option<String>, Option<chrono::DateTime<chrono::Utc>>, Option<String>)>(
         r#"SELECT DISTINCT ON (item_id)
                   idx, item_id, item_name, original_price, discount_amount, sale_price,
-                  discount_start::text, discount_end::text, price_tag_type, stock_status, image_url, uploaded_at
+                  discount_start::text, discount_end::text, price_tag_type, stock_status, image_url, uploaded_at, product_image_url
            FROM costco_items
            WHERE DATE(uploaded_at AT TIME ZONE 'Asia/Seoul') = $1::date
            ORDER BY item_id, idx DESC"#,
@@ -252,6 +257,7 @@ async fn items_handler(
                 "stock_status": r.9,
                 "image_url": r.10,
                 "uploaded_at": r.11,
+                "product_image_url": r.12,
             })).collect();
             Json(json!({ "date": date, "count": list.len(), "items": list }))
         }
@@ -301,13 +307,15 @@ async fn process_image(
         .collect();
 
     for (idx, item) in analysis_results.iter().enumerate() {
+        let product_img = fetch_costco_image(&item.item_id).await;
+
         // 같은 날 같은 item_id가 있으면 UPDATE, 없으면 INSERT
         let updated = sqlx::query(
             r#"
             UPDATE costco_items SET
                 item_name = $2, original_price = $3, discount_amount = $4, sale_price = $5,
                 discount_start = $6, discount_end = $7, price_tag_type = $8, stock_status = $9,
-                image_url = $10, uploaded_at = $11
+                image_url = $10, uploaded_at = $11, product_image_url = $12
             WHERE item_id = $1
               AND DATE(uploaded_at AT TIME ZONE 'Asia/Seoul') = DATE($11 AT TIME ZONE 'Asia/Seoul')
             "#,
@@ -323,6 +331,7 @@ async fn process_image(
         .bind(&item.stock_status)
         .bind(processed_file_path.to_str())
         .bind(uploaded_at)
+        .bind(product_img.as_deref())
         .execute(&state.db)
         .await;
 
@@ -332,8 +341,8 @@ async fn process_image(
                 sqlx::query(
                     r#"
                     INSERT INTO costco_items
-                    (item_id, item_name, original_price, discount_amount, sale_price, discount_start, discount_end, price_tag_type, stock_status, image_url, uploaded_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                    (item_id, item_name, original_price, discount_amount, sale_price, discount_start, discount_end, price_tag_type, stock_status, image_url, uploaded_at, product_image_url)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                     "#,
                 )
                 .bind(&item.item_id)
@@ -347,6 +356,7 @@ async fn process_image(
                 .bind(&item.stock_status)
                 .bind(processed_file_path.to_str())
                 .bind(uploaded_at)
+                .bind(product_img.as_deref())
                 .execute(&state.db)
                 .await
                 .is_ok()
@@ -370,6 +380,26 @@ async fn process_image(
     }
 
     Ok((analysis_results.len(), saved_count, analysis_results))
+}
+
+async fn fetch_costco_image(item_id: &str) -> Option<String> {
+    let url = format!(
+        "https://www.costco.co.kr/rest/v2/korea/products/{}?fields=images,code&lang=ko&curr=KRW",
+        item_id
+    );
+    let client = reqwest::Client::new();
+    let res = client
+        .get(&url)
+        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        .header("Accept", "application/json")
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+        .ok()?;
+    let json: serde_json::Value = res.json().await.ok()?;
+    let images = json.get("images")?.as_array()?;
+    let relative = images.first()?.get("url")?.as_str()?;
+    Some(format!("https://www.costco.co.kr{}", relative))
 }
 
 async fn analyze_with_gemini(api_key: &str, image_data: &[u8]) -> Result<Vec<AnalysisResult>, Box<dyn std::error::Error + Send + Sync>> {

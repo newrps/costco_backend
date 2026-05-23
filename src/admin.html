@@ -25,6 +25,8 @@
   .card { background: white; border-radius: 10px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
   .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
   .item-name { font-size: 0.95rem; font-weight: 600; line-height: 1.4; flex: 1; }
+  .product-img { width: 80px; height: 80px; object-fit: contain; border-radius: 6px; background: #f5f5f5; flex-shrink: 0; margin-left: 10px; }
+  .product-img-table { width: 48px; height: 48px; object-fit: contain; border-radius: 4px; background: #f5f5f5; display: block; }
   .prices { margin: 10px 0; }
   .sale-price { font-size: 1.4rem; font-weight: 700; color: #c62828; }
   .original-price { font-size: 0.85rem; color: #999; text-decoration: line-through; margin-left: 6px; }
@@ -148,7 +150,10 @@ function renderCard(data) {
     <div class="card">
       <div class="card-header">
         <div class="item-name">${item.item_name}</div>
-        ${tagBadge(item.price_tag_type)}
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+          ${tagBadge(item.price_tag_type, false)}
+          ${item.product_image_url ? `<img class="product-img" src="${item.product_image_url}" alt="${item.item_name}" loading="lazy" onerror="this.style.display='none'">` : ''}
+        </div>
       </div>
       <div class="prices">
         <span class="sale-price">${formatPrice(item.sale_price)}</span>
@@ -171,6 +176,7 @@ function renderTable(data) {
     <table>
       <thead>
         <tr>
+          <th>이미지</th>
           <th>상품번호</th>
           <th>상품명</th>
           <th>판매가</th>
@@ -184,6 +190,7 @@ function renderTable(data) {
       <tbody>
         ${data.items.map(item => `
         <tr>
+          <td>${item.product_image_url ? `<img class="product-img-table" src="${item.product_image_url}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}</td>
           <td>${item.item_id}</td>
           <td>${item.item_name}</td>
           <td class="price-cell">${formatPrice(item.sale_price)}</td>

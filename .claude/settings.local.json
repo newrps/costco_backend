@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh -p 56822 -o StrictHostKeyChecking=no newrps@192.168.123.110 \"curl -s -X POST 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyDkI2Ivj6k3X80HB01Bty-tbCagWXv-r8w' -H 'Content-Type: application/json' -d '{\\\\\"contents\\\\\":[{\\\\\"parts\\\\\":[{\\\\\"text\\\\\":\\\\\"return only: hello\\\\\"}]}]}' 2>&1\")"
+    ]
+  }
+}
