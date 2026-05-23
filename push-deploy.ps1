@@ -72,7 +72,7 @@ Remove-Item $tmpTar -ErrorAction SilentlyContinue
 
 # 3) NAS에서 압축 해제 + docker compose up --build
 Write-Host "[nas] 빌드 및 재시작 중... (2~5분 소요)" -ForegroundColor Cyan
-$remoteCmd = "cd '$nasPath' && tar -xf _deploy.tar && rm -f _deploy.tar && /usr/local/bin/docker compose up -d --build"
+$remoteCmd = "cd '$nasPath' && rm -f docker-compose.yml && tar -xf _deploy.tar && rm -f _deploy.tar && /usr/local/bin/docker compose up -d --build"
 ssh -p $nasPort -o StrictHostKeyChecking=no "${nasUser}@${nasHost}" $remoteCmd
 if ($LASTEXITCODE -eq 0) {
   Write-Host "[완료] 배포 성공!" -ForegroundColor Green
