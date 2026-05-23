@@ -187,7 +187,6 @@ function renderTable(data) {
     <table>
       <thead>
         <tr>
-          <th>이미지</th>
           <th>상품명</th>
           <th>판매가</th>
           <th>원가</th>
@@ -200,7 +199,6 @@ function renderTable(data) {
       <tbody>
         ${data.items.map(item => `
         <tr>
-          <td>${item.product_image_url ? `<img class="product-img-table" src="${item.product_image_url}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}</td>
           <td>${item.item_name}</td>
           <td class="price-cell">${formatPrice(item.sale_price)}</td>
           <td class="strike">${item.original_price ? formatPrice(item.original_price) : ''}</td>
