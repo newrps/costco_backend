@@ -44,6 +44,7 @@ struct AnalysisResult {
 struct AppState {
     db: Pool<Postgres>,
     gemini_api_key: String,
+    paddle_ocr_url: Option<String>,
     storage_path: String,
     processed_path: String,
     inbox_path: String,
@@ -57,6 +58,7 @@ async fn main() {
 
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let gemini_api_key = std::env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY must be set");
+    let paddle_ocr_url = std::env::var("PADDLE_OCR_URL").ok();
     let storage_path = std::env::var("STORAGE_PATH").unwrap_or_else(|_| "./storage".to_string());
     let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
 
@@ -83,9 +85,16 @@ async fn main() {
         .await
         .ok();
 
+    if let Some(ref url) = paddle_ocr_url {
+        tracing::info!("PaddleOCR enabled: {}", url);
+    } else {
+        tracing::info!("PaddleOCR disabled, using Gemini vision directly");
+    }
+
     let shared_state = Arc::new(AppState {
         db: pool,
         gemini_api_key,
+        paddle_ocr_url,
         storage_path,
         processed_path,
         inbox_path: inbox_path.clone(),
@@ -311,8 +320,14 @@ async fn process_image(
         None
     };
 
-    // Gemini AI 분석
-    let analysis_results = analyze_with_gemini(&state.gemini_api_key, &file_data).await?;
+    // 이미지 분석
+    let analysis_results = if let Some(ref ocr_url) = state.paddle_ocr_url {
+        let raw_text = extract_text_with_paddle(ocr_url, &file_data).await?;
+        tracing::info!("PaddleOCR extracted: {}", &raw_text[..raw_text.len().min(200)]);
+        analyze_text_with_gemini(&state.gemini_api_key, &raw_text).await?
+    } else {
+        analyze_with_gemini(&state.gemini_api_key, &file_data).await?
+    };
 
     // DB 저장
     let mut saved_count = 0;
@@ -422,7 +437,7 @@ async fn fetch_costco_image(item_id: &str) -> Option<String> {
 async fn analyze_with_gemini(api_key: &str, image_data: &[u8]) -> Result<Vec<AnalysisResult>, Box<dyn std::error::Error + Send + Sync>> {
     let base64_image = general_purpose::STANDARD.encode(image_data);
     let url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={}",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={}",
         api_key
     );
 
@@ -462,22 +477,52 @@ async fn analyze_with_gemini(api_key: &str, image_data: &[u8]) -> Result<Vec<Ana
     });
 
     let client = reqwest::Client::new();
-    let res = client.post(url).json(&body).send().await?;
-    let response_json: Value = res.json().await?;
 
-    let text = response_json["candidates"][0]["content"]["parts"][0]["text"]
-        .as_str()
-        .ok_or("Invalid response from Gemini")?;
+    for attempt in 1u32..=3 {
+        let res = client.post(&url).json(&body).send().await?;
+        let status = res.status().as_u16();
 
-    tracing::info!("Gemini raw response: {}", &text[..text.len().min(500)]);
+        if status == 429 {
+            if attempt < 3 {
+                let secs = attempt as u64 * 10;
+                tracing::warn!("Gemini rate limited (attempt {}/3), retrying in {}s...", attempt, secs);
+                tokio::time::sleep(tokio::time::Duration::from_secs(secs)).await;
+                continue;
+            }
+            return Err("Gemini rate limit exceeded after 3 attempts".into());
+        }
 
-    let json_str = text.trim_matches(|c| c == '`' || c == '\n' || c == ' ');
-    let json_str = if json_str.starts_with("json") { &json_str[4..] } else { json_str };
+        let response_json: Value = res.json().await?;
 
-    let results: Vec<AnalysisResult> = serde_json::from_str(json_str).map_err(|e| {
-        tracing::error!("JSON parse error: {} — raw: {}", e, &json_str[..json_str.len().min(300)]);
-        e
-    })?;
-    tracing::info!("Gemini parsed {} items", results.len());
-    Ok(results)
+        if let Some(err) = response_json.get("error") {
+            let code = err["code"].as_i64().unwrap_or(0);
+            let msg = err["message"].as_str().unwrap_or("unknown error").to_string();
+            tracing::error!("Gemini API error {}: {}", code, msg);
+            if (code == 429 || msg.contains("RESOURCE_EXHAUSTED")) && attempt < 3 {
+                let secs = attempt as u64 * 10;
+                tracing::warn!("Gemini resource exhausted (attempt {}/3), retrying in {}s...", attempt, secs);
+                tokio::time::sleep(tokio::time::Duration::from_secs(secs)).await;
+                continue;
+            }
+            return Err(format!("Gemini API error {}: {}", code, msg).into());
+        }
+
+        let text = response_json["candidates"][0]["content"]["parts"][0]["text"]
+            .as_str()
+            .ok_or("Invalid response from Gemini")?;
+
+        tracing::info!("Gemini response (attempt {}): {}", attempt, &text[..text.len().min(500)]);
+
+        let json_str = text.trim_matches(|c| c == '`' || c == '\n' || c == ' ');
+        let json_str = if json_str.starts_with("json") { &json_str[4..] } else { json_str };
+
+        let results: Vec<AnalysisResult> = serde_json::from_str(json_str).map_err(|e| {
+            tracing::error!("JSON parse error: {} — raw: {}", e, &json_str[..json_str.len().min(300)]);
+            e
+        })?;
+        tracing::info!("Gemini parsed {} items", results.len());
+        return Ok(results);
+    }
+
+    Err("Gemini analysis failed after 3 attempts".into())
 }
