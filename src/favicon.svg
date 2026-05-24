@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- 파란 배경 -->
+  <rect width="32" height="32" rx="7" fill="#005daa"/>
+  <!-- 가격표 모양 (흰색) -->
+  <path d="M4 8 L20 8 L28 16 L20 24 L4 24 Z" fill="white"/>
+  <!-- 구멍 -->
+  <circle cx="9" cy="16" r="2.2" fill="#005daa"/>
+  <!-- 빨간 할인 바 -->
+  <rect x="13" y="11.5" width="11" height="3" rx="1.5" fill="#c62828"/>
+  <rect x="13" y="17.5" width="8" height="3" rx="1.5" fill="#c62828"/>
+</svg>

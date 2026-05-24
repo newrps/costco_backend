@@ -106,6 +106,8 @@ async fn main() {
 
     let app = Router::new()
         .route("/health", get(|| async { "OK" }))
+        .route("/favicon.ico", get(favicon_handler))
+        .route("/favicon.svg", get(favicon_handler))
         .route("/upload", post(upload_handler))
         .route("/items", get(items_handler))
         .route("/sale-items", get(sale_items_handler))
@@ -295,6 +297,14 @@ async fn items_handler(
 // 웹 관리 페이지
 async fn admin_page_handler() -> Html<&'static str> {
     Html(include_str!("admin.html"))
+}
+
+// 파비콘
+async fn favicon_handler() -> impl axum::response::IntoResponse {
+    (
+        [(axum::http::header::CONTENT_TYPE, "image/svg+xml")],
+        include_str!("favicon.svg"),
+    )
 }
 
 // 공개 페이지
