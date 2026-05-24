@@ -23,7 +23,7 @@
   .card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
 
   .card-img { width: 100%; height: 180px; object-fit: contain; background: #f8f8f8; display: block; }
-  .card-img-placeholder { width: 100%; height: 80px; background: #f0f4f8; display: flex; align-items: center; justify-content: center; font-size: 2rem; }
+  .card-img-placeholder { width: 100%; height: 180px; background: #f0f4f8; display: flex; align-items: center; justify-content: center; font-size: 2rem; }
 
   .card-body { padding: 14px 16px; }
   .card-name { font-size: 0.95rem; font-weight: 600; line-height: 1.4; margin-bottom: 10px; min-height: 2.8rem; }
@@ -48,6 +48,7 @@
   .badge-mfr       { background: #f3e5f5; color: #7b1fa2; }
   .badge-instock   { background: #e8f5e9; color: #2e7d32; }
   .badge-lastchance{ background: #fff9c4; color: #f57f17; }
+  .badge-category  { background: #e3f2fd; color: #1565c0; }
 
   .period { font-size: 0.78rem; color: #999; }
 
@@ -130,6 +131,11 @@ function tagBadge(type) {
   return `<span class="badge ${info.cls}">${type}</span>`;
 }
 
+function categoryBadge(cat) {
+  if (!cat) return '';
+  return `<span class="badge badge-category">${cat}</span>`;
+}
+
 function stockBadge(s) {
   const info = STOCK_INFO[s];
   if (!info) return '';
@@ -188,6 +194,7 @@ function renderItems() {
         ${item.discount_amount ? `<div class="discount-badge">↓ ${formatPrice(item.discount_amount)} 할인</div>` : ''}
         <div class="card-meta">
           ${daysBadge(item.discount_end)}
+          ${categoryBadge(item.category)}
           ${tagBadge(item.price_tag_type)}
           ${stockBadge(item.stock_status)}
           ${periodHtml}

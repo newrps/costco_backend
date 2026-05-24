@@ -39,6 +39,8 @@ struct AnalysisResult {
     discount_end: Option<String>,
     price_tag_type: String,
     stock_status: String,
+    #[serde(default)]
+    category: Option<String>,
 }
 
 struct AppState {
@@ -79,6 +81,10 @@ async fn main() {
         .expect("Failed to connect to Postgres");
 
     sqlx::query("ALTER TABLE costco_items ADD COLUMN IF NOT EXISTS product_image_url TEXT")
+        .execute(&pool)
+        .await
+        .ok();
+    sqlx::query("ALTER TABLE costco_items ADD COLUMN IF NOT EXISTS category TEXT")
         .execute(&pool)
         .await
         .ok();
@@ -249,10 +255,10 @@ async fn items_handler(
     let date = params.get("date").cloned()
         .unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d").to_string());
 
-    let rows = sqlx::query_as::<_, (i32, String, String, Option<i32>, Option<i32>, i32, Option<String>, Option<String>, String, String, Option<String>, Option<chrono::DateTime<chrono::Utc>>, Option<String>)>(
+    let rows = sqlx::query_as::<_, (i32, String, String, Option<i32>, Option<i32>, i32, Option<String>, Option<String>, String, String, Option<String>, Option<chrono::DateTime<chrono::Utc>>, Option<String>, Option<String>)>(
         r#"SELECT DISTINCT ON (item_id)
                   idx, item_id, item_name, original_price, discount_amount, sale_price,
-                  discount_start::text, discount_end::text, price_tag_type, stock_status, image_url, uploaded_at, product_image_url
+                  discount_start::text, discount_end::text, price_tag_type, stock_status, image_url, uploaded_at, product_image_url, category
            FROM costco_items
            WHERE DATE(uploaded_at AT TIME ZONE 'Asia/Seoul') = $1::date
            ORDER BY item_id, idx DESC"#,
@@ -277,6 +283,7 @@ async fn items_handler(
                 "image_url": r.10,
                 "uploaded_at": r.11,
                 "product_image_url": r.12,
+                "category": r.13,
             })).collect();
             Json(json!({ "date": date, "count": list.len(), "items": list }))
         }
@@ -298,12 +305,11 @@ async fn sale_page_handler() -> Html<&'static str> {
 async fn sale_items_handler(
     State(state): State<Arc<AppState>>,
 ) -> Json<serde_json::Value> {
-    let rows = sqlx::query_as::<_, (i32, String, String, Option<i32>, Option<i32>, i32, Option<String>, Option<String>, String, String, Option<String>, Option<String>)>(
+    let rows = sqlx::query_as::<_, (i32, String, String, Option<i32>, Option<i32>, i32, Option<String>, Option<String>, String, String, Option<String>, Option<String>, Option<String>)>(
         r#"SELECT DISTINCT ON (item_id)
                   idx, item_id, item_name, original_price, discount_amount, sale_price,
                   discount_start::text, discount_end::text, price_tag_type, stock_status,
-                  product_image_url,
-                  uploaded_at::text
+                  product_image_url, uploaded_at::text, category
            FROM costco_items
            WHERE discount_amount IS NOT NULL
              AND (discount_start IS NULL OR discount_start <= (NOW() AT TIME ZONE 'Asia/Seoul')::date)
@@ -328,6 +334,7 @@ async fn sale_items_handler(
                 "stock_status": r.9,
                 "product_image_url": r.10,
                 "uploaded_at": r.11,
+                "category": r.12,
             })).collect();
             Json(json!({ "count": list.len(), "items": list }))
         }
@@ -371,7 +378,7 @@ async fn process_image(
         .collect();
 
     for (idx, item) in analysis_results.iter().enumerate() {
-        let product_img = fetch_costco_image(&item.item_id).await;
+        let product_img = fetch_costco_image(&item.item_id, &item.item_name).await;
 
         // 같은 날 같은 item_id가 있으면 UPDATE, 없으면 INSERT
         let updated = sqlx::query(
@@ -379,7 +386,7 @@ async fn process_image(
             UPDATE costco_items SET
                 item_name = $2, original_price = $3, discount_amount = $4, sale_price = $5,
                 discount_start = $6, discount_end = $7, price_tag_type = $8, stock_status = $9,
-                image_url = $10, uploaded_at = $11, product_image_url = $12
+                image_url = $10, uploaded_at = $11, product_image_url = $12, category = $13
             WHERE item_id = $1
               AND DATE(uploaded_at AT TIME ZONE 'Asia/Seoul') = DATE($11 AT TIME ZONE 'Asia/Seoul')
             "#,
@@ -396,6 +403,7 @@ async fn process_image(
         .bind(processed_file_path.to_str())
         .bind(uploaded_at)
         .bind(product_img.as_deref())
+        .bind(item.category.as_deref())
         .execute(&state.db)
         .await;
 
@@ -405,8 +413,8 @@ async fn process_image(
                 sqlx::query(
                     r#"
                     INSERT INTO costco_items
-                    (item_id, item_name, original_price, discount_amount, sale_price, discount_start, discount_end, price_tag_type, stock_status, image_url, uploaded_at, product_image_url)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                    (item_id, item_name, original_price, discount_amount, sale_price, discount_start, discount_end, price_tag_type, stock_status, image_url, uploaded_at, product_image_url, category)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
                     "#,
                 )
                 .bind(&item.item_id)
@@ -421,6 +429,7 @@ async fn process_image(
                 .bind(processed_file_path.to_str())
                 .bind(uploaded_at)
                 .bind(product_img.as_deref())
+                .bind(item.category.as_deref())
                 .execute(&state.db)
                 .await
                 .is_ok()
@@ -446,23 +455,56 @@ async fn process_image(
     Ok((analysis_results.len(), saved_count, analysis_results))
 }
 
-async fn fetch_costco_image(item_id: &str) -> Option<String> {
+async fn fetch_costco_image(item_id: &str, item_name: &str) -> Option<String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        .build()
+        .ok()?;
+
+    // 1차: item_id로 직접 조회
+    if let Some(url) = fetch_image_by_id(&client, item_id).await {
+        return Some(url);
+    }
+
+    // 2차: 상품명으로 검색
+    fetch_image_by_name(&client, item_name).await
+}
+
+async fn fetch_image_by_id(client: &reqwest::Client, item_id: &str) -> Option<String> {
     let url = format!(
         "https://www.costco.co.kr/rest/v2/korea/products/{}?fields=images,code&lang=ko&curr=KRW",
         item_id
     );
-    let client = reqwest::Client::new();
-    let res = client
-        .get(&url)
-        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    let res = client.get(&url)
         .header("Accept", "application/json")
-        .timeout(std::time::Duration::from_secs(5))
-        .send()
-        .await
-        .ok()?;
+        .send().await.ok()?;
+    if !res.status().is_success() { return None; }
     let json: serde_json::Value = res.json().await.ok()?;
     let images = json.get("images")?.as_array()?;
     let relative = images.first()?.get("url")?.as_str()?;
+    Some(format!("https://www.costco.co.kr{}", relative))
+}
+
+async fn fetch_image_by_name(client: &reqwest::Client, item_name: &str) -> Option<String> {
+    let res = client
+        .get("https://www.costco.co.kr/rest/v2/korea/products/search")
+        .query(&[
+            ("query", item_name),
+            ("fields", "products(images,name,code)"),
+            ("lang", "ko"),
+            ("curr", "KRW"),
+            ("pageSize", "1"),
+        ])
+        .header("Accept", "application/json")
+        .send().await.ok()?;
+    if !res.status().is_success() { return None; }
+    let json: serde_json::Value = res.json().await.ok()?;
+    let products = json.get("products")?.as_array()?;
+    let product = products.first()?;
+    let images = product.get("images")?.as_array()?;
+    let relative = images.first()?.get("url")?.as_str()?;
+    tracing::info!("Image found by name search for '{}'", item_name);
     Some(format!("https://www.costco.co.kr{}", relative))
 }
 
@@ -485,6 +527,8 @@ Return a JSON array of objects with these fields:
    - 'Manufacturer Discount' if ends in 49 or 79
    - 'Normal' otherwise
 9. stock_status: '+' -> 'In Stock', '*' -> 'Last Chance', else 'Normal'.
+10. category: Product category in Korean. Choose EXACTLY one from this list:
+   식품·음료, 냉장·냉동, 과일·채소·견과류, 육류·수산, 가전·전자, 의류·패션, 생활용품·청소, 건강·뷰티, 주방용품, 가구·침구, 스포츠·레저, 완구·유아용품, 자동차용품, 기타
 
 Respond ONLY with a valid JSON array. If nothing found, return [].";
 
