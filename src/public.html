@@ -13,126 +13,139 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 header {
   background: linear-gradient(135deg, #005daa 0%, #003f7a 100%);
   color: white;
-  padding: 20px 24px 16px;
+  padding: 20px 24px 18px;
   text-align: center;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
-header h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.3px; }
-header p  { font-size: 0.85rem; opacity: 0.8; margin-top: 4px; }
-.header-meta { margin-top: 10px; font-size: 0.82rem; opacity: 0.75; }
+header h1 { font-size: 1.3rem; font-weight: 700; }
+.header-sub { font-size: 0.82rem; opacity: 0.75; margin-top: 3px; }
 
-.cat-bar {
+/* 카테고리 빠른 이동 바 */
+.cat-nav {
   background: white;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid #e8e8e8;
   overflow-x: auto;
   white-space: nowrap;
-  padding: 0 12px;
+  padding: 0 8px;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  position: sticky; top: 72px; z-index: 99;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-.cat-bar::-webkit-scrollbar { display: none; }
-.cat-btn {
+.cat-nav::-webkit-scrollbar { display: none; }
+.cat-nav-btn {
   display: inline-block;
-  padding: 12px 14px;
-  font-size: 0.82rem;
+  padding: 10px 12px;
+  font-size: 0.80rem;
   color: #666;
   cursor: pointer;
   border-bottom: 2px solid transparent;
-  transition: color 0.15s, border-color 0.15s;
-  user-select: none;
+  transition: color 0.15s;
   white-space: nowrap;
 }
-.cat-btn:hover { color: #005daa; }
-.cat-btn.active { color: #005daa; border-bottom-color: #005daa; font-weight: 600; }
+.cat-nav-btn:hover { color: #005daa; }
+.cat-nav-btn.active { color: #005daa; border-bottom-color: #005daa; font-weight: 600; }
 
-.summary-bar {
+.top-summary {
   padding: 12px 20px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: white; border-bottom: 1px solid #eee;
 }
-.count-badge {
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: #005daa;
+.total-count { font-size: 0.9rem; font-weight: 700; color: #005daa; }
+.total-saving { font-size: 0.82rem; color: #c62828; margin-left: auto; }
+.ref-date { font-size: 0.78rem; color: #aaa; }
+
+/* 카테고리 섹션 */
+.section { padding: 20px 16px 8px; }
+.section-header {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 14px;
 }
-.saving-badge {
-  font-size: 0.82rem;
-  color: #c62828;
-  margin-left: auto;
+.section-title {
+  font-size: 1.05rem; font-weight: 700; color: #222;
+}
+.section-count {
+  font-size: 0.78rem; color: #fff; background: #005daa;
+  padding: 2px 8px; border-radius: 20px; font-weight: 600;
+}
+.section-divider {
+  flex: 1; height: 1px; background: #e8e8e8;
 }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 14px;
-  padding: 0 16px 32px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
 }
 
 .card {
   background: white;
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
   transition: transform 0.15s, box-shadow 0.15s;
 }
 .card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.12); }
 
-.card-img-wrap { position: relative; width: 100%; height: 180px; background: #f8f8f8; }
-.card-img { width: 100%; height: 180px; object-fit: contain; display: block; }
-.card-img-placeholder { width: 100%; height: 180px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; background: #f0f4f8; }
+.card-img-wrap { position: relative; }
+.card-img { width: 100%; height: 170px; object-fit: contain; display: block; background: #f8f8f8; }
+.card-img-placeholder { width: 100%; height: 170px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; background: #f0f4f8; }
 
 .days-ribbon {
-  position: absolute;
-  top: 10px; left: 10px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 3px 9px;
-  border-radius: 20px;
+  position: absolute; top: 9px; left: 9px;
+  font-size: 0.70rem; font-weight: 700;
+  padding: 3px 8px; border-radius: 20px;
 }
 .days-urgent { background: #c62828; color: white; }
 .days-soon   { background: #f57f17; color: white; }
 .days-ok     { background: #2e7d32; color: white; }
 .days-none   { background: rgba(0,0,0,0.35); color: white; }
 
-.card-body { padding: 14px 16px 16px; }
-.card-cat  { font-size: 0.72rem; color: #1565c0; background: #e3f2fd; padding: 2px 8px; border-radius: 20px; display: inline-block; margin-bottom: 8px; }
-.card-name { font-size: 0.92rem; font-weight: 600; line-height: 1.45; margin-bottom: 10px; min-height: 2.7rem; }
+.card-body { padding: 12px 14px 14px; }
+.card-name {
+  font-size: 0.88rem; font-weight: 600; line-height: 1.45;
+  margin-bottom: 9px; min-height: 2.6rem;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 
-.price-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
-.sale-price { font-size: 1.45rem; font-weight: 800; color: #c62828; }
-.orig-price { font-size: 0.82rem; color: #bbb; text-decoration: line-through; }
+.price-row { display: flex; align-items: baseline; gap: 7px; margin-bottom: 5px; }
+.sale-price { font-size: 1.35rem; font-weight: 800; color: #c62828; }
+.orig-price { font-size: 0.80rem; color: #bbb; text-decoration: line-through; }
 
 .discount-chip {
   display: inline-block;
-  background: #fff3e0;
-  color: #e65100;
-  font-size: 0.82rem;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 20px;
-  margin-bottom: 10px;
+  background: #fff3e0; color: #e65100;
+  font-size: 0.78rem; font-weight: 700;
+  padding: 2px 9px; border-radius: 20px; margin-bottom: 8px;
 }
 
-.card-badges { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 8px; }
-.badge { font-size: 0.70rem; padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
+.card-badges { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.badge { font-size: 0.68rem; padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
 .badge-double    { background: #fff3e0; color: #e65100; }
 .badge-mfr       { background: #f3e5f5; color: #7b1fa2; }
 .badge-instock   { background: #e8f5e9; color: #2e7d32; }
 .badge-lastchance{ background: #fff9c4; color: #f57f17; }
-.period-txt { font-size: 0.72rem; color: #aaa; margin-left: auto; }
+.period-txt { font-size: 0.68rem; color: #bbb; margin-left: auto; white-space: nowrap; }
 
-.empty { text-align: center; padding: 80px 20px; color: #aaa; }
-.empty-icon { font-size: 3rem; margin-bottom: 14px; }
+.empty-section { text-align: center; padding: 40px; color: #bbb; font-size: 0.9rem; }
 .loading { text-align: center; padding: 80px 20px; color: #aaa; font-size: 0.95rem; }
+.no-data { text-align: center; padding: 80px 20px; }
+.no-data-icon { font-size: 3rem; margin-bottom: 14px; }
+.no-data p { color: #aaa; font-size: 0.9rem; }
 
-footer { text-align: center; padding: 20px; font-size: 0.78rem; color: #bbb; }
+footer { text-align: center; padding: 24px 16px; font-size: 0.76rem; color: #ccc; }
 
 @media (max-width: 480px) {
-  .grid { grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0 10px 24px; }
-  .card-name { font-size: 0.82rem; min-height: 2.4rem; }
-  .sale-price { font-size: 1.2rem; }
-  .card-body { padding: 10px 12px 12px; }
+  header { padding: 14px 16px 12px; }
+  header h1 { font-size: 1.1rem; }
+  .cat-nav { top: 60px; }
+  .grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .card-body { padding: 9px 10px 11px; }
+  .card-name { font-size: 0.80rem; min-height: 2.3rem; }
+  .sale-price { font-size: 1.1rem; }
+  .card-img, .card-img-placeholder { height: 140px; }
+  .section { padding: 16px 10px 4px; }
 }
 </style>
 </head>
@@ -140,30 +153,32 @@ footer { text-align: center; padding: 20px; font-size: 0.78rem; color: #bbb; }
 
 <header>
   <h1>🏷️ 코스트코 오늘의 할인</h1>
-  <p>실시간 할인 상품 정보</p>
-  <div class="header-meta" id="headerDate"></div>
+  <div class="header-sub" id="headerSub">불러오는 중...</div>
 </header>
 
-<div class="cat-bar" id="catBar"></div>
+<div class="cat-nav" id="catNav"></div>
 
-<div class="summary-bar">
-  <span class="count-badge" id="countText"></span>
-  <span class="saving-badge" id="savingText"></span>
+<div class="top-summary" id="topSummary" style="display:none">
+  <span class="total-count" id="totalCount"></span>
+  <span class="ref-date" id="refDate"></span>
+  <span class="total-saving" id="totalSaving"></span>
 </div>
 
-<div id="content" class="loading">불러오는 중...</div>
+<div id="mainContent"><div class="loading">불러오는 중...</div></div>
 
-<footer>데이터는 매장 방문 후 직접 수집한 정보입니다.</footer>
+<footer>매장에서 직접 수집한 실시간 할인 정보입니다.</footer>
 
 <script>
-let allItems = [];
-let currentCat = '전체';
-
-const CATEGORIES = ['전체','식품·음료','냉장·냉동','과일·채소·견과류','육류·수산','가전·전자','의류·패션','생활용품·청소','건강·뷰티','주방용품','가구·침구','스포츠·레저','완구·유아용품','자동차용품','기타'];
-
+const CATEGORY_ORDER = ['식품·음료','냉장·냉동','과일·채소·견과류','육류·수산','가전·전자','의류·패션','생활용품·청소','건강·뷰티','주방용품','가구·침구','스포츠·레저','완구·유아용품','자동차용품','기타'];
+const CAT_ICONS = {
+  '식품·음료':'🥤','냉장·냉동':'❄️','과일·채소·견과류':'🥦','육류·수산':'🥩',
+  '가전·전자':'📺','의류·패션':'👕','생활용품·청소':'🧹','건강·뷰티':'💊',
+  '주방용품':'🍳','가구·침구':'🛋️','스포츠·레저':'⚽','완구·유아용품':'🧸',
+  '자동차용품':'🚗','기타':'📦',
+};
 const TAG_INFO = {
-  'Double Discount':       { cls: 'badge-double',    label: '더블할인' },
-  'Manufacturer Discount': { cls: 'badge-mfr',       label: '제조사할인' },
+  'Double Discount':       { cls: 'badge-double',     label: '더블할인' },
+  'Manufacturer Discount': { cls: 'badge-mfr',        label: '제조사할인' },
 };
 const STOCK_INFO = {
   'In Stock':    { cls: 'badge-instock',    label: '재입고미정' },
@@ -189,70 +204,96 @@ function daysRibbon(endStr) {
   return `<span class="days-ribbon days-ok">${d}일 남음</span>`;
 }
 
-function buildCatBar() {
-  const bar = document.getElementById('catBar');
-  // 실제 데이터에 있는 카테고리만 표시 + 전체
-  const present = new Set(allItems.map(i => i.category).filter(Boolean));
-  const cats = CATEGORIES.filter(c => c === '전체' || present.has(c));
-  bar.innerHTML = cats.map(c =>
-    `<span class="cat-btn${c === currentCat ? ' active' : ''}" onclick="selectCat('${c}')">${c}</span>`
+function cardHtml(item) {
+  const imgHtml = item.product_image_url
+    ? `<img class="card-img" src="${item.product_image_url}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<div class=card-img-placeholder>🛒</div>'">`
+    : `<div class="card-img-placeholder">🛒</div>`;
+  const tagInfo   = TAG_INFO[item.price_tag_type];
+  const stockInfo = STOCK_INFO[item.stock_status];
+  const period    = item.discount_start ? `${item.discount_start}~${item.discount_end||''}` : '';
+  return `
+  <div class="card">
+    <div class="card-img-wrap">
+      ${imgHtml}
+      ${daysRibbon(item.discount_end)}
+    </div>
+    <div class="card-body">
+      <div class="card-name">${item.item_name}</div>
+      <div class="price-row">
+        <span class="sale-price">${fmt(item.sale_price)}</span>
+        ${item.original_price ? `<span class="orig-price">${fmt(item.original_price)}</span>` : ''}
+      </div>
+      ${item.discount_amount ? `<span class="discount-chip">↓ ${fmt(item.discount_amount)} 할인</span>` : ''}
+      <div class="card-badges">
+        ${tagInfo   ? `<span class="badge ${tagInfo.cls}">${tagInfo.label}</span>`   : ''}
+        ${stockInfo ? `<span class="badge ${stockInfo.cls}">${stockInfo.label}</span>` : ''}
+        ${period    ? `<span class="period-txt">${period}</span>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function render(items) {
+  // 카테고리별로 묶기
+  const grouped = {};
+  items.forEach(item => {
+    const cat = item.category || '기타';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(item);
+  });
+
+  // 정해진 순서대로 + 순서에 없는 카테고리는 맨 뒤
+  const orderedCats = [
+    ...CATEGORY_ORDER.filter(c => grouped[c]),
+    ...Object.keys(grouped).filter(c => !CATEGORY_ORDER.includes(c)),
+  ];
+
+  // 카테고리 내비 바
+  const nav = document.getElementById('catNav');
+  nav.innerHTML = orderedCats.map(c =>
+    `<span class="cat-nav-btn" onclick="scrollToSection('${c}')">${CAT_ICONS[c]||''} ${c}</span>`
   ).join('');
-}
 
-function selectCat(cat) {
-  currentCat = cat;
-  document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b.textContent === cat));
-  render();
-}
-
-function render() {
-  const items = currentCat === '전체'
-    ? allItems
-    : allItems.filter(i => i.category === currentCat);
-
-  document.getElementById('countText').textContent = `${items.length}개 할인 중`;
-  const total = items.reduce((s, i) => s + (i.discount_amount || 0), 0);
-  document.getElementById('savingText').textContent = total > 0 ? `최대 ${total.toLocaleString()}원 절약 가능` : '';
-
-  const content = document.getElementById('content');
-  if (items.length === 0) {
-    content.className = '';
-    content.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><p>해당 카테고리에 할인 상품이 없습니다.</p></div>`;
-    return;
-  }
-
-  content.className = 'grid';
-  content.innerHTML = items.map(item => {
-    const imgHtml = item.product_image_url
-      ? `<img class="card-img" src="${item.product_image_url}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<div class=card-img-placeholder>🛒</div>'">`
-      : `<div class="card-img-placeholder">🛒</div>`;
-
-    const tagInfo = TAG_INFO[item.price_tag_type];
-    const stockInfo = STOCK_INFO[item.stock_status];
-    const periodStr = item.discount_start ? `${item.discount_start} ~ ${item.discount_end || ''}` : '';
-
+  // 각 카테고리 섹션 렌더
+  const main = document.getElementById('mainContent');
+  main.innerHTML = orderedCats.map(cat => {
+    const catItems = grouped[cat].sort((a,b) => (b.discount_amount||0) - (a.discount_amount||0));
     return `
-    <div class="card">
-      <div class="card-img-wrap">
-        ${imgHtml}
-        ${daysRibbon(item.discount_end)}
+    <div class="section" id="cat-${encodeURIComponent(cat)}">
+      <div class="section-header">
+        <span class="section-title">${CAT_ICONS[cat]||''} ${cat}</span>
+        <span class="section-count">${catItems.length}</span>
+        <div class="section-divider"></div>
       </div>
-      <div class="card-body">
-        ${item.category ? `<span class="card-cat">${item.category}</span>` : ''}
-        <div class="card-name">${item.item_name}</div>
-        <div class="price-row">
-          <span class="sale-price">${fmt(item.sale_price)}</span>
-          ${item.original_price ? `<span class="orig-price">${fmt(item.original_price)}</span>` : ''}
-        </div>
-        ${item.discount_amount ? `<span class="discount-chip">↓ ${fmt(item.discount_amount)} 할인</span>` : ''}
-        <div class="card-badges">
-          ${tagInfo ? `<span class="badge ${tagInfo.cls}">${tagInfo.label}</span>` : ''}
-          ${stockInfo ? `<span class="badge ${stockInfo.cls}">${stockInfo.label}</span>` : ''}
-          ${periodStr ? `<span class="period-txt">${periodStr}</span>` : ''}
-        </div>
-      </div>
+      <div class="grid">${catItems.map(cardHtml).join('')}</div>
     </div>`;
   }).join('');
+
+  // 스크롤 감지해서 활성 카테고리 표시
+  setupScrollSpy(orderedCats);
+}
+
+function scrollToSection(cat) {
+  const el = document.getElementById('cat-' + encodeURIComponent(cat));
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function setupScrollSpy(cats) {
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const cat = decodeURIComponent(e.target.id.replace('cat-', ''));
+        document.querySelectorAll('.cat-nav-btn').forEach(b => {
+          b.classList.toggle('active', b.textContent.trim().endsWith(cat) || b.textContent.includes(cat));
+        });
+      }
+    });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+
+  cats.forEach(c => {
+    const el = document.getElementById('cat-' + encodeURIComponent(c));
+    if (el) observer.observe(el);
+  });
 }
 
 async function load() {
@@ -261,15 +302,28 @@ async function load() {
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
-    allItems = (data.items || []).sort((a, b) => (b.discount_amount || 0) - (a.discount_amount || 0));
-
+    const items = data.items || [];
     const today = new Date().toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
-    document.getElementById('headerDate').textContent = today + ' 기준';
 
-    buildCatBar();
-    render();
+    document.getElementById('headerSub').textContent = today + ' 기준 · ' + items.length + '개 할인 중';
+
+    const sumEl = document.getElementById('topSummary');
+    sumEl.style.display = 'flex';
+    document.getElementById('totalCount').textContent = `총 ${items.length}개 할인 중`;
+    document.getElementById('refDate').textContent = today;
+    const saving = items.reduce((s,i) => s+(i.discount_amount||0), 0);
+    document.getElementById('totalSaving').textContent = saving > 0 ? `최대 ${saving.toLocaleString()}원 절약` : '';
+
+    if (items.length === 0) {
+      document.getElementById('mainContent').innerHTML =
+        `<div class="no-data"><div class="no-data-icon">📭</div><p>오늘 할인 중인 상품이 없습니다.</p></div>`;
+      return;
+    }
+
+    render(items);
   } catch(e) {
-    document.getElementById('content').innerHTML = `<div class="empty"><p>오류: ${e.message}</p></div>`;
+    document.getElementById('mainContent').innerHTML =
+      `<div class="no-data"><p>오류: ${e.message}</p></div>`;
   }
 }
 
