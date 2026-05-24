@@ -112,7 +112,8 @@ function filterItems() {
   const q = document.getElementById('searchBox').value.trim().toLowerCase();
   const discountOnly = document.getElementById('discountOnly').checked;
   let items = currentData.items;
-  if (discountOnly) items = items.filter(i => i.discount_amount || i.price_tag_type !== 'Normal');
+  const DISCOUNT_TYPES = ['Double Discount', 'Clearance', 'Manufacturer Discount'];
+  if (discountOnly) items = items.filter(i => (i.discount_amount && i.discount_amount > 0) || DISCOUNT_TYPES.includes(i.price_tag_type));
   if (q) items = items.filter(i => i.item_name.toLowerCase().includes(q));
   const filtered = { ...currentData, items, count: items.length };
   renderItems(filtered);
@@ -265,7 +266,6 @@ async function loadItems() {
 
 datePicker.value = today();
 loadItems();
-setInterval(loadItems, 30000);
 </script>
 </body>
 </html>
