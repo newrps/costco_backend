@@ -109,6 +109,7 @@ async fn main() {
         .route("/upload", post(upload_handler))
         .route("/items", get(items_handler))
         .route("/sale-items", get(sale_items_handler))
+        .route("/", get(public_page_handler))
         .route("/admin", get(admin_page_handler))
         .route("/sale", get(sale_page_handler))
         .layer(DefaultBodyLimit::max(20 * 1024 * 1024))
@@ -294,6 +295,11 @@ async fn items_handler(
 // 웹 관리 페이지
 async fn admin_page_handler() -> Html<&'static str> {
     Html(include_str!("admin.html"))
+}
+
+// 공개 페이지
+async fn public_page_handler() -> Html<&'static str> {
+    Html(include_str!("public.html"))
 }
 
 // 오늘의 할인 대시보드 페이지

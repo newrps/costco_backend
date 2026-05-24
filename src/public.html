@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>코스트코 오늘의 할인</title>
+<meta property="og:title" content="코스트코 오늘의 할인">
+<meta property="og:description" content="오늘 코스트코에서 할인 중인 상품을 확인하세요">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f6f9; color: #222; }
+
+header {
+  background: linear-gradient(135deg, #005daa 0%, #003f7a 100%);
+  color: white;
+  padding: 20px 24px 16px;
+  text-align: center;
+}
+header h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.3px; }
+header p  { font-size: 0.85rem; opacity: 0.8; margin-top: 4px; }
+.header-meta { margin-top: 10px; font-size: 0.82rem; opacity: 0.75; }
+
+.cat-bar {
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 0 12px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.cat-bar::-webkit-scrollbar { display: none; }
+.cat-btn {
+  display: inline-block;
+  padding: 12px 14px;
+  font-size: 0.82rem;
+  color: #666;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  user-select: none;
+  white-space: nowrap;
+}
+.cat-btn:hover { color: #005daa; }
+.cat-btn.active { color: #005daa; border-bottom-color: #005daa; font-weight: 600; }
+
+.summary-bar {
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.count-badge {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #005daa;
+}
+.saving-badge {
+  font-size: 0.82rem;
+  color: #c62828;
+  margin-left: auto;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  padding: 0 16px 32px;
+}
+
+.card {
+  background: white;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.12); }
+
+.card-img-wrap { position: relative; width: 100%; height: 180px; background: #f8f8f8; }
+.card-img { width: 100%; height: 180px; object-fit: contain; display: block; }
+.card-img-placeholder { width: 100%; height: 180px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; background: #f0f4f8; }
+
+.days-ribbon {
+  position: absolute;
+  top: 10px; left: 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+}
+.days-urgent { background: #c62828; color: white; }
+.days-soon   { background: #f57f17; color: white; }
+.days-ok     { background: #2e7d32; color: white; }
+.days-none   { background: rgba(0,0,0,0.35); color: white; }
+
+.card-body { padding: 14px 16px 16px; }
+.card-cat  { font-size: 0.72rem; color: #1565c0; background: #e3f2fd; padding: 2px 8px; border-radius: 20px; display: inline-block; margin-bottom: 8px; }
+.card-name { font-size: 0.92rem; font-weight: 600; line-height: 1.45; margin-bottom: 10px; min-height: 2.7rem; }
+
+.price-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.sale-price { font-size: 1.45rem; font-weight: 800; color: #c62828; }
+.orig-price { font-size: 0.82rem; color: #bbb; text-decoration: line-through; }
+
+.discount-chip {
+  display: inline-block;
+  background: #fff3e0;
+  color: #e65100;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-bottom: 10px;
+}
+
+.card-badges { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 8px; }
+.badge { font-size: 0.70rem; padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
+.badge-double    { background: #fff3e0; color: #e65100; }
+.badge-mfr       { background: #f3e5f5; color: #7b1fa2; }
+.badge-instock   { background: #e8f5e9; color: #2e7d32; }
+.badge-lastchance{ background: #fff9c4; color: #f57f17; }
+.period-txt { font-size: 0.72rem; color: #aaa; margin-left: auto; }
+
+.empty { text-align: center; padding: 80px 20px; color: #aaa; }
+.empty-icon { font-size: 3rem; margin-bottom: 14px; }
+.loading { text-align: center; padding: 80px 20px; color: #aaa; font-size: 0.95rem; }
+
+footer { text-align: center; padding: 20px; font-size: 0.78rem; color: #bbb; }
+
+@media (max-width: 480px) {
+  .grid { grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0 10px 24px; }
+  .card-name { font-size: 0.82rem; min-height: 2.4rem; }
+  .sale-price { font-size: 1.2rem; }
+  .card-body { padding: 10px 12px 12px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🏷️ 코스트코 오늘의 할인</h1>
+  <p>실시간 할인 상품 정보</p>
+  <div class="header-meta" id="headerDate"></div>
+</header>
+
+<div class="cat-bar" id="catBar"></div>
+
+<div class="summary-bar">
+  <span class="count-badge" id="countText"></span>
+  <span class="saving-badge" id="savingText"></span>
+</div>
+
+<div id="content" class="loading">불러오는 중...</div>
+
+<footer>데이터는 매장 방문 후 직접 수집한 정보입니다.</footer>
+
+<script>
+let allItems = [];
+let currentCat = '전체';
+
+const CATEGORIES = ['전체','식품·음료','냉장·냉동','과일·채소·견과류','육류·수산','가전·전자','의류·패션','생활용품·청소','건강·뷰티','주방용품','가구·침구','스포츠·레저','완구·유아용품','자동차용품','기타'];
+
+const TAG_INFO = {
+  'Double Discount':       { cls: 'badge-double',    label: '더블할인' },
+  'Manufacturer Discount': { cls: 'badge-mfr',       label: '제조사할인' },
+};
+const STOCK_INFO = {
+  'In Stock':    { cls: 'badge-instock',    label: '재입고미정' },
+  'Last Chance': { cls: 'badge-lastchance', label: '마지막물량' },
+};
+
+function fmt(p) { return p != null ? Number(p).toLocaleString() + '원' : ''; }
+
+function daysLeft(s) {
+  if (!s) return null;
+  const d = new Date(s), t = new Date();
+  t.setHours(0,0,0,0); d.setHours(0,0,0,0);
+  return Math.round((d - t) / 86400000);
+}
+
+function daysRibbon(endStr) {
+  const d = daysLeft(endStr);
+  if (d === null) return `<span class="days-ribbon days-none">기간 미정</span>`;
+  if (d < 0) return '';
+  if (d === 0) return `<span class="days-ribbon days-urgent">오늘 마감</span>`;
+  if (d === 1) return `<span class="days-ribbon days-urgent">내일 마감</span>`;
+  if (d <= 3)  return `<span class="days-ribbon days-soon">${d}일 남음</span>`;
+  return `<span class="days-ribbon days-ok">${d}일 남음</span>`;
+}
+
+function buildCatBar() {
+  const bar = document.getElementById('catBar');
+  // 실제 데이터에 있는 카테고리만 표시 + 전체
+  const present = new Set(allItems.map(i => i.category).filter(Boolean));
+  const cats = CATEGORIES.filter(c => c === '전체' || present.has(c));
+  bar.innerHTML = cats.map(c =>
+    `<span class="cat-btn${c === currentCat ? ' active' : ''}" onclick="selectCat('${c}')">${c}</span>`
+  ).join('');
+}
+
+function selectCat(cat) {
+  currentCat = cat;
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b.textContent === cat));
+  render();
+}
+
+function render() {
+  const items = currentCat === '전체'
+    ? allItems
+    : allItems.filter(i => i.category === currentCat);
+
+  document.getElementById('countText').textContent = `${items.length}개 할인 중`;
+  const total = items.reduce((s, i) => s + (i.discount_amount || 0), 0);
+  document.getElementById('savingText').textContent = total > 0 ? `최대 ${total.toLocaleString()}원 절약 가능` : '';
+
+  const content = document.getElementById('content');
+  if (items.length === 0) {
+    content.className = '';
+    content.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><p>해당 카테고리에 할인 상품이 없습니다.</p></div>`;
+    return;
+  }
+
+  content.className = 'grid';
+  content.innerHTML = items.map(item => {
+    const imgHtml = item.product_image_url
+      ? `<img class="card-img" src="${item.product_image_url}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<div class=card-img-placeholder>🛒</div>'">`
+      : `<div class="card-img-placeholder">🛒</div>`;
+
+    const tagInfo = TAG_INFO[item.price_tag_type];
+    const stockInfo = STOCK_INFO[item.stock_status];
+    const periodStr = item.discount_start ? `${item.discount_start} ~ ${item.discount_end || ''}` : '';
+
+    return `
+    <div class="card">
+      <div class="card-img-wrap">
+        ${imgHtml}
+        ${daysRibbon(item.discount_end)}
+      </div>
+      <div class="card-body">
+        ${item.category ? `<span class="card-cat">${item.category}</span>` : ''}
+        <div class="card-name">${item.item_name}</div>
+        <div class="price-row">
+          <span class="sale-price">${fmt(item.sale_price)}</span>
+          ${item.original_price ? `<span class="orig-price">${fmt(item.original_price)}</span>` : ''}
+        </div>
+        ${item.discount_amount ? `<span class="discount-chip">↓ ${fmt(item.discount_amount)} 할인</span>` : ''}
+        <div class="card-badges">
+          ${tagInfo ? `<span class="badge ${tagInfo.cls}">${tagInfo.label}</span>` : ''}
+          ${stockInfo ? `<span class="badge ${stockInfo.cls}">${stockInfo.label}</span>` : ''}
+          ${periodStr ? `<span class="period-txt">${periodStr}</span>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function load() {
+  try {
+    const res = await fetch('/sale-items');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    allItems = (data.items || []).sort((a, b) => (b.discount_amount || 0) - (a.discount_amount || 0));
+
+    const today = new Date().toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+    document.getElementById('headerDate').textContent = today + ' 기준';
+
+    buildCatBar();
+    render();
+  } catch(e) {
+    document.getElementById('content').innerHTML = `<div class="empty"><p>오류: ${e.message}</p></div>`;
+  }
+}
+
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
