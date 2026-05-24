@@ -92,6 +92,7 @@
     <input type="checkbox" id="discountOnly" checked onchange="filterItems()" style="width:16px;height:16px;cursor:pointer;">
     할인상품만
   </label>
+  <button class="btn" style="background:#e8f5e9;color:#2e7d32;" onclick="copyAsTable()">📋 복사</button>
   <div style="margin-left:auto; display:flex; gap:6px;">
     <button class="btn btn-view" id="btnCard" onclick="setView('card')">카드</button>
     <button class="btn btn-view active" id="btnTable" onclick="setView('table')">표</button>
@@ -107,16 +108,60 @@ const datePicker = document.getElementById('datePicker');
 let currentView = 'table';
 let currentData = null;
 
-function filterItems() {
-  if (!currentData) return;
+const DISCOUNT_TYPES = ['Double Discount', 'Clearance', 'Manufacturer Discount'];
+
+function getFilteredItems() {
+  if (!currentData) return [];
   const q = document.getElementById('searchBox').value.trim().toLowerCase();
   const discountOnly = document.getElementById('discountOnly').checked;
   let items = currentData.items;
-  const DISCOUNT_TYPES = ['Double Discount', 'Clearance', 'Manufacturer Discount'];
   if (discountOnly) items = items.filter(i => (i.discount_amount && i.discount_amount > 0) || DISCOUNT_TYPES.includes(i.price_tag_type));
   if (q) items = items.filter(i => i.item_name.toLowerCase().includes(q));
+  return items;
+}
+
+function filterItems() {
+  if (!currentData) return;
+  const items = getFilteredItems();
   const filtered = { ...currentData, items, count: items.length };
   renderItems(filtered);
+}
+
+async function copyAsTable() {
+  const items = getFilteredItems();
+  if (!items.length) { showToast('복사할 데이터가 없습니다.'); return; }
+
+  const thStyle = 'padding:8px 12px;border:1px solid #004a8f;text-align:left;white-space:nowrap;';
+  const tdStyle = 'padding:8px 12px;border:1px solid #ddd;vertical-align:middle;';
+
+  const headers = ['상품명','판매가','할인액','카테고리','타입','재고','할인기간'];
+  const thead = `<tr style="background:#005daa;color:white;">${headers.map(h => `<th style="${thStyle}">${h}</th>`).join('')}</tr>`;
+
+  const tbody = items.map((item, i) => {
+    const bg = i % 2 === 1 ? 'background:#f9f9f9;' : '';
+    return `<tr>
+      <td style="${tdStyle}${bg}">${item.item_name}</td>
+      <td style="${tdStyle}${bg}font-weight:bold;color:#c62828;text-align:right;">${formatPrice(item.sale_price)}</td>
+      <td style="${tdStyle}${bg}color:#e65100;text-align:right;">${item.discount_amount ? '↓' + formatPrice(item.discount_amount) : ''}</td>
+      <td style="${tdStyle}${bg}">${item.category || ''}</td>
+      <td style="${tdStyle}${bg}">${item.price_tag_type}</td>
+      <td style="${tdStyle}${bg}">${item.stock_status || ''}</td>
+      <td style="${tdStyle}${bg}font-size:0.85em;color:#888;">${item.discount_start ? item.discount_start + ' ~ ' + (item.discount_end || '') : ''}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `<table style="border-collapse:collapse;font-family:sans-serif;font-size:14px;"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+  const plain = [headers.join('\t'), ...items.map(i => [i.item_name, formatPrice(i.sale_price), i.discount_amount ? formatPrice(i.discount_amount) : '', i.category||'', i.price_tag_type, i.stock_status||'', i.discount_start ? i.discount_start + ' ~ ' + (i.discount_end||'') : ''].join('\t'))].join('\n');
+
+  try {
+    await navigator.clipboard.write([new ClipboardItem({
+      'text/html': new Blob([html], { type: 'text/html' }),
+      'text/plain': new Blob([plain], { type: 'text/plain' }),
+    })]);
+    showToast(`✅ ${items.length}건 복사됨 — 에디터에 붙여넣기 하세요`);
+  } catch(e) {
+    showToast('복사 실패: ' + e.message);
+  }
 }
 
 (function() {
