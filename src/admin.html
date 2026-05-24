@@ -256,7 +256,7 @@ async function loadItems() {
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     currentData = data;
-    renderItems(data);
+    filterItems();
     if (data.count > 0) showToast(`✅ ${data.count}건 로드됨`);
   } catch(e) {
     document.getElementById('content').innerHTML = `<div class="empty"><p>오류: ${e.message}</p></div>`;
