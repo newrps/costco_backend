@@ -37,14 +37,17 @@ git 없이 NAS 배포만:
 
 ---
 
-## 2. OpenAI API 키 교체
+## 2. Gemini API 키 교체
 
-키가 만료되거나 교체가 필요하면 로그에 `OpenAI API error` 표시.
+키가 만료되거나 교체가 필요하면 로그에 `Gemini API error 401` 또는 `403` 표시됨.
+
+> **보안 주의**: API 키는 절대 채팅창이나 터미널 화면에 붙여넣지 말 것. 반드시 NAS에 SSH 접속 후 nano로 직접 수정.
 
 ### 새 키 발급
-[https://platform.openai.com/api-keys](https://platform.openai.com/api-keys) → **Create new secret key**
+- **Cloud Console 키 (유료)**: [console.cloud.google.com](https://console.cloud.google.com) → API 및 서비스 → 사용자 인증 정보
+- **AI Studio 키 (무료)**: [aistudio.google.com](https://aistudio.google.com) → Get API Key
 
-### NAS에 직접 교체 (절대 채팅/터미널에 키를 붙여넣지 말 것)
+### NAS에서 키 교체
 
 **1. SSH 접속**
 ```powershell
@@ -56,7 +59,7 @@ ssh -p 56822 newrps@192.168.123.110
 nano /volume1/docker/costco_backend/.env
 ```
 
-`OPENAI_API_KEY=` 줄을 새 키로 교체 후 저장 (`Ctrl+X` → `Y` → `Enter`)
+`GEMINI_API_KEY=` 줄을 새 키로 교체 후 저장 (`Ctrl+X` → `Y` → `Enter`)
 
 **3. 백엔드 재시작**
 ```bash
@@ -64,18 +67,29 @@ cd /volume1/docker/costco_backend
 /usr/local/bin/docker compose restart backend
 ```
 
+### 현재 사용 모델
+`gemini-2.5-flash-lite` (v1beta 엔드포인트)
+
+| 모델 | 입력 (1M 토큰) | 출력 (1M 토큰) |
+|------|--------------|--------------|
+| gemini-2.5-flash-lite | $0.10 | $0.40 |
+| gemini-2.5-flash | $0.30 | $2.50 |
+
 ---
 
 ## 3. 가격표 등록 방법
 
-### 방법 1 - 앱/API로 직접 업로드
+### 방법 1 - 관리자 페이지에서 직접 업로드
+`http://192.168.123.110:3100/admin` → 파일 선택 후 업로드
+
+### 방법 2 - API로 업로드
 ```
 POST http://192.168.123.110:3100/upload
 Content-Type: multipart/form-data
 필드: image (파일)
 ```
 
-### 방법 2 - inbox 폴더에 사진 복사 (자동 감지)
+### 방법 3 - inbox 폴더에 사진 복사 (자동 감지)
 ```powershell
 scp -P 56822 photo.jpg newrps@192.168.123.110:/volume1/docker/costco_backend/storage/inbox/
 ```
@@ -87,12 +101,17 @@ scp -P 56822 photo.jpg newrps@192.168.123.110:/volume1/docker/costco_backend/sto
 4. 실패 시 1초 간격 최대 3회 재시도
 5. 3회 모두 실패 → `storage/error/` 폴더로 이동
 
+### 사진 vs 영상 업로드 차이
+- **사진**: 1장씩 분석 → 정확도 높음
+- **영상**: Gemini가 여러 프레임을 동시에 분석 → 서로 다른 가격표 정보가 혼용될 수 있음
+- 가능하면 **가격표 하나씩 사진으로 찍어 업로드**하는 것을 권장
+
 ---
 
 ## 4. 가격표 종류 (price_tag_type)
 
 | 끝 두 자리 | 종류 | 설명 |
-|---|---|---|
+|-----------|------|------|
 | .90 | Normal | 일반 정상가 |
 | .70 / .00 | Double Discount | 매니저 특별 할인 (재고 소진용 대폭 할인) |
 | .49 / .79 | Manufacturer Discount | 생산업체 프로모션 할인 |
@@ -100,7 +119,7 @@ scp -P 56822 photo.jpg newrps@192.168.123.110:/volume1/docker/costco_backend/sto
 ## 5. 재고 상태 (stock_status)
 
 | 기호 | 상태 | 설명 |
-|---|---|---|
+|------|------|------|
 | + | In Stock | 재입고 불분명 — 판매 추이에 따라 결정 |
 | * | Last Chance | 마지막 물량 — 재주문 없이 소진 후 단종 |
 | (없음) | Normal | 일반 재고 |
@@ -130,11 +149,17 @@ ssh -p 56822 newrps@192.168.123.110
 
 유용한 SQL:
 ```sql
--- 전체 데이터 확인
+-- 전체 데이터 확인 (최신순)
 SELECT * FROM costco_items ORDER BY uploaded_at DESC LIMIT 20;
 
 -- 오늘 데이터
 SELECT * FROM costco_items WHERE DATE(uploaded_at AT TIME ZONE 'Asia/Seoul') = CURRENT_DATE;
+
+-- 특정 상품 이력
+SELECT * FROM costco_items WHERE item_id = '123456' ORDER BY uploaded_at DESC;
+
+-- 할인 상품만
+SELECT * FROM costco_items WHERE discount_amount IS NOT NULL ORDER BY uploaded_at DESC;
 
 -- 데이터 전체 삭제
 TRUNCATE TABLE costco_items;
@@ -151,7 +176,7 @@ TRUNCATE TABLE costco_items;
 ssh -p 56822 newrps@192.168.123.110
 cd /volume1/docker/costco_backend
 
-# 재시작
+# 백엔드만 재시작
 /usr/local/bin/docker compose restart backend
 
 # 전체 중지
@@ -159,36 +184,32 @@ cd /volume1/docker/costco_backend
 
 # 전체 시작
 /usr/local/bin/docker compose up -d
+
+# 상태 확인
+/usr/local/bin/docker compose ps
 ```
 
 ---
 
-## 9. 최초 NAS 세팅 (처음 한 번만)
+## 9. 자주 발생하는 문제
 
+### Gemini API 오류: 모델 deprecated
+```
+Gemini API error 404: This model is no longer available
+```
+→ `src/main.rs`의 모델명을 최신 모델로 변경 후 재배포  
+→ 현재 모델: `gemini-2.5-flash-lite`
+
+### 분석은 됐는데 0개 저장
+→ `storage/error/` 폴더 확인. JSON 파싱 실패 가능성.  
+→ `docker logs costco-backend | grep ERROR` 로 원인 확인
+
+### 영상 업로드 시 상품명/가격 혼용
+→ 여러 가격표가 동시에 보이는 프레임에서 AI가 정보를 혼용하는 현상  
+→ 가격표 하나씩 사진으로 찍어 업로드하면 해결
+
+### DB 연결 오류
 ```bash
-ssh -p 56822 newrps@192.168.123.110
-
-mkdir -p /volume1/docker/costco_backend
-cd /volume1/docker/costco_backend
-```
-
-`.env` 파일 생성:
-```bash
-nano .env
-```
-
-내용:
-```
-DATABASE_URL=postgres://newrps:Pspspsps1234!!@db:5432/costco_db
-OPENAI_API_KEY=여기에_OpenAI_API_키_입력
-PORT=3000
-STORAGE_PATH=/app/storage
-INBOX_PATH=/app/storage/inbox
-PROCESSED_PATH=/app/storage/processed
-ERROR_PATH=/app/storage/error
-```
-
-이후 Windows PC에서 첫 배포:
-```powershell
-.\push-deploy.ps1 -Force
+/usr/local/bin/docker compose restart db
+/usr/local/bin/docker compose restart backend
 ```
