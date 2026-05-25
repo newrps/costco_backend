@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>상품 상세 - 코스트코 할인정보</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; }
+
+header {
+  background: #005daa; color: white;
+  padding: 14px 20px;
+  display: flex; align-items: center; gap: 12px;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.back-btn {
+  color: white; text-decoration: none; font-size: 0.88rem;
+  padding: 6px 12px; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px;
+  white-space: nowrap; flex-shrink: 0;
+}
+.header-title { font-size: 0.95rem; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fav-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 2px; line-height: 1; flex-shrink: 0; }
+
+.hero { background: white; padding: 20px; display: flex; gap: 20px; border-bottom: 1px solid #e0e0e0; }
+.hero-img { width: 140px; height: 140px; object-fit: contain; border-radius: 10px; background: #f5f5f5; flex-shrink: 0; }
+.hero-img-placeholder { width: 140px; height: 140px; border-radius: 10px; background: #f0f4f8; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; flex-shrink: 0; }
+.hero-info { flex: 1; min-width: 0; }
+.hero-name { font-size: 1.05rem; font-weight: 700; line-height: 1.5; margin-bottom: 10px; }
+.hero-price { font-size: 1.8rem; font-weight: 800; color: #c62828; }
+.hero-orig { font-size: 0.88rem; color: #aaa; text-decoration: line-through; margin-left: 8px; }
+.hero-disc { font-size: 0.88rem; color: #e65100; margin-left: 4px; }
+.hero-meta { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; font-size: 0.82rem; color: #666; align-items: center; }
+
+.section { padding: 16px 20px; }
+.section-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 14px; border-left: 4px solid #005daa; padding-left: 10px; color: #222; }
+
+.chart-wrap { background: white; border-radius: 10px; padding: 16px 16px 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 16px; overflow: hidden; }
+canvas { display: block; width: 100%; }
+
+.hist-table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); font-size: 0.85rem; }
+.hist-table th { background: #005daa; color: white; padding: 9px 12px; text-align: left; font-weight: 600; white-space: nowrap; }
+.hist-table td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+.hist-table tr:last-child td { border-bottom: none; }
+.hist-table tr:hover td { background: #f8f9ff; }
+.hist-table tr.today td { background: #e3f0ff; }
+.price-cell { font-weight: 700; color: #c62828; white-space: nowrap; }
+.disc-cell { color: #e65100; white-space: nowrap; }
+
+.badge { font-size: 0.70rem; padding: 2px 7px; border-radius: 20px; white-space: nowrap; display: inline-block; }
+.badge-normal    { background: #e3f0ff; color: #005daa; }
+.badge-double    { background: #fff3e0; color: #e65100; }
+.badge-clearance { background: #fce4ec; color: #c62828; }
+.badge-mfr       { background: #f3e5f5; color: #7b1fa2; }
+.badge-category  { background: #e3f2fd; color: #1565c0; }
+.badge-instock   { background: #e8f5e9; color: #2e7d32; }
+.badge-lastchance{ background: #fff9c4; color: #f57f17; }
+
+.loading { text-align: center; padding: 60px; color: #aaa; font-size: 0.95rem; }
+.empty { text-align: center; padding: 60px; color: #aaa; }
+
+@media (max-width: 480px) {
+  .hero { flex-direction: column; }
+  .hero-img, .hero-img-placeholder { width: 100%; height: 200px; }
+  .hist-table th:nth-child(4), .hist-table td:nth-child(4) { display: none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a class="back-btn" href="javascript:history.back()">← 뒤로</a>
+  <span class="header-title" id="headerTitle">상품 상세</span>
+  <button class="fav-btn" id="favBtn" onclick="toggleFav()" title="즐겨찾기">🤍</button>
+</header>
+
+<div id="mainContent"><div class="loading">불러오는 중...</div></div>
+
+<script>
+const itemId = location.pathname.split('/item/')[1] || '';
+
+const TAG_INFO = {
+  'Normal':                { cls: 'badge-normal' },
+  'Double Discount':       { cls: 'badge-double' },
+  'Clearance':             { cls: 'badge-clearance' },
+  'Manufacturer Discount': { cls: 'badge-mfr' },
+};
+const STOCK_INFO = {
+  'In Stock':    { cls: 'badge-instock',    label: '+재입고미정' },
+  'Last Chance': { cls: 'badge-lastchance', label: '*마지막물량' },
+};
+
+function getFavs() { return JSON.parse(localStorage.getItem('costco_favorites') || '[]'); }
+function saveFavs(f) { localStorage.setItem('costco_favorites', JSON.stringify(f)); }
+
+function updateFavBtn() {
+  const isFav = getFavs().includes(String(itemId));
+  document.getElementById('favBtn').textContent = isFav ? '❤️' : '🤍';
+}
+
+function toggleFav() {
+  let favs = getFavs();
+  const id = String(itemId);
+  favs = favs.includes(id) ? favs.filter(x => x !== id) : [...favs, id];
+  saveFavs(favs);
+  updateFavBtn();
+}
+
+function fmt(p) { return p != null ? Number(p).toLocaleString() + '원' : ''; }
+
+function drawChart(records) {
+  const canvas = document.getElementById('priceChart');
+  if (!canvas || records.length < 2) return;
+
+  const data = [...records].reverse();
+  const prices = data.map(r => r.sale_price);
+  const labels = data.map(r => (r.uploaded_at || '').slice(5, 10));
+
+  const dpr = window.devicePixelRatio || 1;
+  const cw = canvas.parentElement.clientWidth - 32;
+  const ch = 180;
+  canvas.width = cw * dpr;
+  canvas.height = ch * dpr;
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const pad = { top: 16, right: 16, bottom: 32, left: 68 };
+  const W = cw - pad.left - pad.right;
+  const H = ch - pad.top - pad.bottom;
+
+  const minP = Math.min(...prices);
+  const maxP = Math.max(...prices);
+  const range = maxP - minP || 1;
+  const yOf = p => pad.top + H - ((p - minP) / range) * H;
+  const xOf = i => pad.left + (W / Math.max(prices.length - 1, 1)) * i;
+
+  // grid
+  ctx.strokeStyle = '#f0f0f0'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 3; i++) {
+    const y = pad.top + (H / 3) * i;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + W, y); ctx.stroke();
+    const val = maxP - (range / 3) * i;
+    ctx.fillStyle = '#bbb'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText(Math.round(val).toLocaleString(), pad.left - 6, y + 4);
+  }
+
+  // fill
+  ctx.beginPath();
+  prices.forEach((p, i) => { i === 0 ? ctx.moveTo(xOf(i), yOf(p)) : ctx.lineTo(xOf(i), yOf(p)); });
+  ctx.lineTo(xOf(prices.length - 1), pad.top + H);
+  ctx.lineTo(xOf(0), pad.top + H);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(0,93,170,0.1)'; ctx.fill();
+
+  // line
+  ctx.beginPath(); ctx.strokeStyle = '#005daa'; ctx.lineWidth = 2;
+  prices.forEach((p, i) => { i === 0 ? ctx.moveTo(xOf(i), yOf(p)) : ctx.lineTo(xOf(i), yOf(p)); });
+  ctx.stroke();
+
+  // dots
+  prices.forEach((p, i) => {
+    ctx.beginPath(); ctx.arc(xOf(i), yOf(p), 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#005daa'; ctx.fill();
+    ctx.strokeStyle = 'white'; ctx.lineWidth = 1.5; ctx.stroke();
+  });
+
+  // x labels
+  ctx.fillStyle = '#bbb'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+  const step = Math.max(1, Math.floor(labels.length / 6));
+  labels.forEach((l, i) => {
+    if (i % step === 0 || i === labels.length - 1) {
+      ctx.fillText(l, xOf(i), pad.top + H + 18);
+    }
+  });
+}
+
+async function load() {
+  try {
+    const res = await fetch(`/item/${itemId}/history`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    const records = data.records || [];
+    if (!records.length) {
+      document.getElementById('mainContent').innerHTML = '<div class="empty">데이터가 없습니다.</div>';
+      return;
+    }
+
+    const latest = records[0];
+    document.getElementById('headerTitle').textContent = latest.item_name;
+    document.title = latest.item_name + ' - 코스트코 할인정보';
+    updateFavBtn();
+
+    const tagCls = (TAG_INFO[latest.price_tag_type] || {}).cls || 'badge-normal';
+    const stockInfo = STOCK_INFO[latest.stock_status];
+
+    const imgHtml = latest.product_image_url
+      ? `<img class="hero-img" src="${latest.product_image_url}" alt="" onerror="this.outerHTML='<div class=hero-img-placeholder>🛒</div>'">`
+      : `<div class="hero-img-placeholder">🛒</div>`;
+
+    const histRows = records.map((r, idx) => {
+      const tc = (TAG_INFO[r.price_tag_type] || {}).cls || 'badge-normal';
+      const isLatest = idx === 0;
+      return `<tr class="${isLatest ? 'today' : ''}">
+        <td>${(r.uploaded_at || '').slice(0, 10)}</td>
+        <td class="price-cell">${fmt(r.sale_price)}</td>
+        <td class="disc-cell">${r.discount_amount ? '↓' + fmt(r.discount_amount) : '-'}</td>
+        <td>${r.original_price ? fmt(r.original_price) : '-'}</td>
+        <td><span class="badge ${tc}">${r.price_tag_type}</span></td>
+        <td style="font-size:0.80rem;color:#999;">${r.discount_start ? r.discount_start + (r.discount_end ? '~' + r.discount_end : '') : '-'}</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('mainContent').innerHTML = `
+      <div class="hero">
+        ${imgHtml}
+        <div class="hero-info">
+          <div class="hero-name">${latest.item_name}</div>
+          <div>
+            <span class="hero-price">${fmt(latest.sale_price)}</span>
+            ${latest.original_price ? `<span class="hero-orig">${fmt(latest.original_price)}</span>` : ''}
+            ${latest.discount_amount ? `<span class="hero-disc">↓${fmt(latest.discount_amount)}</span>` : ''}
+          </div>
+          <div class="hero-meta">
+            <span style="color:#aaa;font-size:0.78rem;">🔖 ${latest.item_id}</span>
+            ${latest.category ? `<span class="badge badge-category">${latest.category}</span>` : ''}
+            <span class="badge ${tagCls}">${latest.price_tag_type}</span>
+            ${stockInfo ? `<span class="badge ${stockInfo.cls}">${stockInfo.label}</span>` : ''}
+            ${latest.discount_start ? `<span style="font-size:0.78rem;">📅 ${latest.discount_start}${latest.discount_end ? ' ~ ' + latest.discount_end : ''}</span>` : ''}
+          </div>
+        </div>
+      </div>
+
+      ${records.length >= 2 ? `
+      <div class="section">
+        <div class="section-title">가격 추이 (${records.length}회 기록)</div>
+        <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
+      </div>` : ''}
+
+      <div class="section">
+        <div class="section-title">할인 이력</div>
+        <table class="hist-table">
+          <thead><tr>
+            <th>날짜</th><th>판매가</th><th>할인액</th><th>정가</th><th>타입</th><th>할인기간</th>
+          </tr></thead>
+          <tbody>${histRows}</tbody>
+        </table>
+      </div>
+    `;
+
+    if (records.length >= 2) requestAnimationFrame(() => drawChart(records));
+
+  } catch(e) {
+    document.getElementById('mainContent').innerHTML = `<div class="loading">오류: ${e.message}</div>`;
+  }
+}
+
+load();
+</script>
+</body>
+</html>

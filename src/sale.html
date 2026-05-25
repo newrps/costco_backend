@@ -86,6 +86,7 @@
   <button class="sort-btn active" onclick="setSort('discount')">할인액 순</button>
   <button class="sort-btn" onclick="setSort('price')">가격 순</button>
   <button class="sort-btn" onclick="setSort('days')">마감 임박순</button>
+  <button id="favFilterBtn" onclick="toggleFavFilter()" style="margin-left:auto;padding:5px 12px;border:1px solid #ddd;border-radius:20px;background:white;font-size:0.80rem;cursor:pointer;color:#888;">❤️ 즐겨찾기</button>
 </div>
 
 <div id="content" class="loading">불러오는 중...</div>
@@ -94,6 +95,28 @@
 <script>
 let allItems = [];
 let currentSort = 'discount';
+let favFilterOn = false;
+
+function getFavs() { return JSON.parse(localStorage.getItem('costco_favorites') || '[]'); }
+function saveFavs(f) { localStorage.setItem('costco_favorites', JSON.stringify(f)); }
+
+function toggleFavFilter() {
+  favFilterOn = !favFilterOn;
+  const btn = document.getElementById('favFilterBtn');
+  btn.style.background = favFilterOn ? '#c62828' : 'white';
+  btn.style.color = favFilterOn ? 'white' : '#888';
+  btn.style.borderColor = favFilterOn ? '#c62828' : '#ddd';
+  renderItems();
+}
+
+function toggleItemFav(itemId, btn) {
+  let favs = getFavs();
+  const id = String(itemId);
+  if (favs.includes(id)) { favs = favs.filter(x => x !== id); btn.textContent = '🤍'; }
+  else { favs.push(id); btn.textContent = '❤️'; }
+  saveFavs(favs);
+  if (favFilterOn) renderItems();
+}
 
 const TAG_INFO = {
   'Double Discount':       { cls: 'badge-double',    tip: '매니저 특별 할인' },
@@ -153,7 +176,8 @@ function setSort(type) {
 }
 
 function getSorted() {
-  const items = [...allItems];
+  const favs = getFavs();
+  const items = favFilterOn ? allItems.filter(i => favs.includes(String(i.item_id))) : [...allItems];
   if (currentSort === 'discount') return items.sort((a,b) => (b.discount_amount||0) - (a.discount_amount||0));
   if (currentSort === 'price') return items.sort((a,b) => a.sale_price - b.sale_price);
   if (currentSort === 'days') {
@@ -175,7 +199,14 @@ function renderItems() {
     return;
   }
 
+  if (sorted.length === 0 && favFilterOn) {
+    content.className = '';
+    content.innerHTML = `<div class="empty"><div style="font-size:2.5rem">🤍</div><p style="margin-top:8px;color:#aaa;">즐겨찾기한 상품이 없습니다.</p></div>`;
+    return;
+  }
+
   content.className = 'grid';
+  const favs = getFavs();
   content.innerHTML = sorted.map(item => {
     const imgHtml = item.product_image_url
       ? `<img class="card-img" src="${item.product_image_url}" alt="${item.item_name}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=card-img-placeholder>🛒</div>'">`
@@ -185,8 +216,10 @@ function renderItems() {
       ? `<span class="period">${item.discount_start} ~ ${item.discount_end || ''}</span>`
       : '';
 
+    const isFav = favs.includes(String(item.item_id));
+
     return `
-    <div class="card">
+    <div class="card" onclick="location.href='/item/${item.item_id}'" style="cursor:pointer;">
       ${imgHtml}
       <div class="card-body">
         <div class="card-name">${item.item_name}</div>
@@ -201,6 +234,7 @@ function renderItems() {
           ${tagBadge(item.price_tag_type)}
           ${stockBadge(item.stock_status)}
           ${periodHtml}
+          <button onclick="event.stopPropagation();toggleItemFav('${item.item_id}',this)" style="margin-left:auto;background:none;border:none;font-size:1.1rem;cursor:pointer;padding:0;line-height:1;">${isFav ? '❤️' : '🤍'}</button>
         </div>
       </div>
     </div>`;

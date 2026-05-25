@@ -1,5 +1,5 @@
 use axum::{
-    extract::{DefaultBodyLimit, Multipart, Query, State},
+    extract::{DefaultBodyLimit, Multipart, Path, Query, State},
     response::Html,
     routing::{get, post},
     Json, Router,
@@ -109,6 +109,8 @@ async fn main() {
         .route("/favicon.ico", get(favicon_handler))
         .route("/favicon.svg", get(favicon_handler))
         .route("/og-image.png", get(og_image_handler))
+        .route("/item/:item_id", get(item_page_handler))
+        .route("/item/:item_id/history", get(item_history_handler))
         .route("/upload", post(upload_handler))
         .route("/items", get(items_handler))
         .route("/sale-items", get(sale_items_handler))
@@ -313,6 +315,53 @@ async fn og_image_handler() -> impl axum::response::IntoResponse {
         [(axum::http::header::CONTENT_TYPE, "image/png")],
         include_bytes!("og-image.png").as_ref(),
     )
+}
+
+async fn item_page_handler() -> Html<&'static str> {
+    Html(include_str!("item.html"))
+}
+
+async fn item_history_handler(
+    State(state): State<Arc<AppState>>,
+    Path(item_id): Path<String>,
+) -> Json<serde_json::Value> {
+    let rows = sqlx::query_as::<_, (i32, String, String, Option<i32>, Option<i32>, i32, Option<String>, Option<String>, String, String, Option<String>, Option<String>, Option<chrono::DateTime<chrono::Utc>>)>(
+        r#"SELECT idx, item_id, item_name, original_price, discount_amount, sale_price,
+                  discount_start::text, discount_end::text, price_tag_type, stock_status,
+                  product_image_url, category, uploaded_at
+           FROM costco_items
+           WHERE item_id = $1
+           ORDER BY uploaded_at DESC"#,
+    )
+    .bind(&item_id)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(items) => {
+            let list: Vec<_> = items.iter().map(|r| json!({
+                "idx": r.0,
+                "item_id": r.1,
+                "item_name": r.2,
+                "original_price": r.3,
+                "discount_amount": r.4,
+                "sale_price": r.5,
+                "discount_start": r.6,
+                "discount_end": r.7,
+                "price_tag_type": r.8,
+                "stock_status": r.9,
+                "product_image_url": r.10,
+                "category": r.11,
+                "uploaded_at": r.12,
+            })).collect();
+            let item_name = list.first()
+                .and_then(|i| i["item_name"].as_str())
+                .unwrap_or("")
+                .to_string();
+            Json(json!({ "item_id": item_id, "item_name": item_name, "count": list.len(), "records": list }))
+        }
+        Err(e) => Json(json!({ "error": e.to_string() })),
+    }
 }
 
 // 공개 페이지

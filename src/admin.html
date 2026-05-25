@@ -227,7 +227,7 @@ function renderCard(data) {
   const content = document.getElementById('content');
   content.className = 'grid';
   content.innerHTML = data.items.map(item => `
-    <div class="card">
+    <div class="card" onclick="location.href='/item/${item.item_id}'" style="cursor:pointer;">
       <div class="card-header">
         <div class="item-name">${item.item_name}</div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -268,7 +268,7 @@ function renderTable(data) {
       </thead>
       <tbody>
         ${data.items.map(item => `
-        <tr>
+        <tr onclick="location.href='/item/${item.item_id}'" style="cursor:pointer;">
           <td>${item.item_name}</td>
           <td class="price-cell">${formatPrice(item.sale_price)}</td>
           <td class="disc">${item.discount_amount ? '↓' + formatPrice(item.discount_amount) : ''}</td>

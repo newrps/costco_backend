@@ -171,6 +171,7 @@ footer { text-align: center; padding: 24px 16px; font-size: 0.76rem; color: #ccc
   <span class="total-count" id="totalCount"></span>
   <span class="ref-date" id="refDate"></span>
   <span class="total-saving" id="totalSaving"></span>
+  <button id="favFilterBtn" onclick="toggleFavFilter()" style="margin-left:auto;padding:5px 12px;border:1px solid #ddd;border-radius:20px;background:white;font-size:0.80rem;cursor:pointer;color:#888;">❤️ 즐겨찾기</button>
 </div>
 
 <div id="mainContent"><div class="loading">불러오는 중...</div></div>
@@ -178,7 +179,30 @@ footer { text-align: center; padding: 24px 16px; font-size: 0.76rem; color: #ccc
 <footer>매장에서 직접 수집한 실시간 할인 정보입니다.</footer>
 
 <script>
-const CATEGORY_ORDER = ['식품·음료','냉장·냉동','과일·채소·견과류','육류·수산','가전·전자','의류·패션','생활용품·청소','건강·뷰티','주방용품','가구·침구','스포츠·레저','완구·유아용품','자동차용품','기타'];
+// 즐겨찾기
+function getFavs() { return JSON.parse(localStorage.getItem('costco_favorites') || '[]'); }
+function saveFavs(f) { localStorage.setItem('costco_favorites', JSON.stringify(f)); }
+let favFilterOn = false;
+
+function toggleFavFilter() {
+  favFilterOn = !favFilterOn;
+  const btn = document.getElementById('favFilterBtn');
+  btn.style.background = favFilterOn ? '#c62828' : 'white';
+  btn.style.color = favFilterOn ? 'white' : '#888';
+  btn.style.borderColor = favFilterOn ? '#c62828' : '#ddd';
+  renderWithFilter();
+}
+
+function renderWithFilter() {
+  const favs = getFavs();
+  const items = favFilterOn ? (window._allItems || []).filter(i => favs.includes(String(i.item_id))) : (window._allItems || []);
+  render(items);
+  if (favFilterOn && items.length === 0) {
+    document.getElementById('mainContent').innerHTML = '<div class="no-data"><div class="no-data-icon">🤍</div><p>즐겨찾기한 상품이 없습니다.</p></div>';
+  }
+}
+
+const CATEGORY_ORDER =['식품·음료','냉장·냉동','과일·채소·견과류','육류·수산','가전·전자','의류·패션','생활용품·청소','건강·뷰티','주방용품','가구·침구','스포츠·레저','완구·유아용품','자동차용품','기타'];
 const CAT_ICONS = {
   '식품·음료':'🥤','냉장·냉동':'❄️','과일·채소·견과류':'🥦','육류·수산':'🥩',
   '가전·전자':'📺','의류·패션':'👕','생활용품·청소':'🧹','건강·뷰티':'💊',
@@ -220,8 +244,9 @@ function cardHtml(item) {
   const tagInfo   = TAG_INFO[item.price_tag_type];
   const stockInfo = STOCK_INFO[item.stock_status];
   const period    = item.discount_start ? `${item.discount_start}~${item.discount_end||''}` : '';
+  const isFav = getFavs().includes(String(item.item_id));
   return `
-  <div class="card">
+  <div class="card" onclick="location.href='/item/${item.item_id}'" style="cursor:pointer;">
     <div class="card-img-wrap">
       ${imgHtml}
       ${daysRibbon(item.discount_end)}
@@ -237,9 +262,24 @@ function cardHtml(item) {
         ${tagInfo   ? `<span class="badge ${tagInfo.cls}">${tagInfo.label}</span>`   : ''}
         ${stockInfo ? `<span class="badge ${stockInfo.cls}">${stockInfo.label}</span>` : ''}
         ${period    ? `<span class="period-txt">${period}</span>` : ''}
+        <button onclick="event.stopPropagation();toggleItemFav('${item.item_id}',this)" style="margin-left:auto;background:none;border:none;font-size:1.1rem;cursor:pointer;padding:0;line-height:1;">${isFav ? '❤️' : '🤍'}</button>
       </div>
     </div>
   </div>`;
+}
+
+function toggleItemFav(itemId, btn) {
+  let favs = getFavs();
+  const id = String(itemId);
+  if (favs.includes(id)) {
+    favs = favs.filter(x => x !== id);
+    btn.textContent = '🤍';
+  } else {
+    favs.push(id);
+    btn.textContent = '❤️';
+  }
+  saveFavs(favs);
+  if (favFilterOn) renderWithFilter();
 }
 
 function render(items) {
@@ -312,6 +352,7 @@ async function load() {
     if (data.error) throw new Error(data.error);
 
     const items = data.items || [];
+    window._allItems = items;
     const today = new Date().toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
 
     document.getElementById('headerSub').textContent = today + ' 기준 · ' + items.length + '개 할인 중';
@@ -329,7 +370,7 @@ async function load() {
       return;
     }
 
-    render(items);
+    renderWithFilter();
   } catch(e) {
     document.getElementById('mainContent').innerHTML =
       `<div class="no-data"><p>오류: ${e.message}</p></div>`;
