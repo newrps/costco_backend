@@ -108,6 +108,7 @@ async fn main() {
         .route("/health", get(|| async { "OK" }))
         .route("/favicon.ico", get(favicon_handler))
         .route("/favicon.svg", get(favicon_handler))
+        .route("/og-image.png", get(og_image_handler))
         .route("/upload", post(upload_handler))
         .route("/items", get(items_handler))
         .route("/sale-items", get(sale_items_handler))
@@ -304,6 +305,13 @@ async fn favicon_handler() -> impl axum::response::IntoResponse {
     (
         [(axum::http::header::CONTENT_TYPE, "image/svg+xml")],
         include_str!("favicon.svg"),
+    )
+}
+
+async fn og_image_handler() -> impl axum::response::IntoResponse {
+    (
+        [(axum::http::header::CONTENT_TYPE, "image/png")],
+        include_bytes!("og-image.png").as_ref(),
     )
 }
 
