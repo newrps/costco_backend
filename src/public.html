@@ -165,6 +165,13 @@ footer { text-align: center; padding: 24px 16px; font-size: 0.76rem; color: #ccc
   <div class="header-sub" id="headerSub">불러오는 중...</div>
 </header>
 
+<div style="background:white;border-bottom:1px solid #eee;padding:8px 16px;">
+  <div style="position:relative;display:flex;align-items:center;max-width:500px;margin:0 auto;">
+    <span style="position:absolute;left:12px;color:#aaa;font-size:0.9rem;">🔍</span>
+    <input type="text" id="pubSearchBox" placeholder="상품명·카테고리 검색 (초성 가능)..." style="width:100%;padding:8px 34px 8px 34px;border:1px solid #e0e0e0;border-radius:20px;font-size:0.85rem;outline:none;background:#f8f8f8;">
+    <button id="pubClearSearch" onclick="clearPubSearch()" style="position:absolute;right:12px;background:none;border:none;cursor:pointer;color:#aaa;display:none;">✕</button>
+  </div>
+</div>
 <div class="cat-nav" id="catNav"></div>
 
 <div class="top-summary" id="topSummary" style="display:none">
@@ -179,6 +186,23 @@ footer { text-align: center; padding: 24px 16px; font-size: 0.76rem; color: #ccc
 <footer>매장에서 직접 수집한 실시간 할인 정보입니다.</footer>
 
 <script>
+// 초성 검색
+const CHOSUNG = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+function getInitial(c) { const n=c.charCodeAt(0); return n>=0xAC00&&n<=0xD7A3?CHOSUNG[Math.floor((n-0xAC00)/588)]:c.toLowerCase(); }
+function toInitials(s) { return [...s].map(getInitial).join(''); }
+function isAllChosung(s) { return s.length>0&&[...s].every(c=>CHOSUNG.includes(c)); }
+function searchMatch(q,...fields) {
+  const qn=q.replace(/\s+/g,'').toLowerCase(); if(!qn)return true;
+  const cho=isAllChosung(qn);
+  return fields.some(f=>{ if(f==null)return false; const t=String(f).replace(/\s+/g,'').toLowerCase(); return cho?toInitials(t).includes(qn):t.includes(qn); });
+}
+let pubQuery = '';
+function clearPubSearch() {
+  document.getElementById('pubSearchBox').value='';
+  document.getElementById('pubClearSearch').style.display='none';
+  pubQuery=''; renderWithFilter();
+}
+
 // 즐겨찾기
 function getFavs() { return JSON.parse(localStorage.getItem('costco_favorites') || '[]'); }
 function saveFavs(f) { localStorage.setItem('costco_favorites', JSON.stringify(f)); }
@@ -195,10 +219,13 @@ function toggleFavFilter() {
 
 function renderWithFilter() {
   const favs = getFavs();
-  const items = favFilterOn ? (window._allItems || []).filter(i => favs.includes(String(i.item_id))) : (window._allItems || []);
+  let items = window._allItems || [];
+  if (favFilterOn) items = items.filter(i => favs.includes(String(i.item_id)));
+  if (pubQuery) items = items.filter(i => searchMatch(pubQuery, i.item_name, i.category));
   render(items);
-  if (favFilterOn && items.length === 0) {
-    document.getElementById('mainContent').innerHTML = '<div class="no-data"><div class="no-data-icon">🤍</div><p>즐겨찾기한 상품이 없습니다.</p></div>';
+  if (items.length === 0) {
+    const msg = favFilterOn ? '🤍 즐겨찾기한 상품이 없습니다.' : `'${pubQuery}'에 해당하는 상품이 없습니다.`;
+    document.getElementById('mainContent').innerHTML = `<div class="no-data"><div class="no-data-icon">📭</div><p>${msg}</p></div>`;
   }
 }
 
@@ -379,6 +406,15 @@ async function load() {
 
 load();
 setInterval(load, 60000);
+
+(function() {
+  let composing = false;
+  const box = document.getElementById('pubSearchBox');
+  box.addEventListener('compositionstart', () => composing = true);
+  box.addEventListener('compositionend', () => { composing = false; pubQuery = box.value.trim(); document.getElementById('pubClearSearch').style.display = pubQuery ? 'block' : 'none'; renderWithFilter(); });
+  box.addEventListener('input', () => { if (!composing) { pubQuery = box.value.trim(); document.getElementById('pubClearSearch').style.display = pubQuery ? 'block' : 'none'; renderWithFilter(); } });
+  box.addEventListener('keydown', e => { if (e.key === 'Escape') clearPubSearch(); });
+})();
 </script>
 </body>
 </html>

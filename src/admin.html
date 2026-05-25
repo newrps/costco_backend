@@ -87,7 +87,11 @@
   <input type="date" id="datePicker">
 
   <button class="btn btn-primary" onclick="loadItems()">조회</button>
-  <input type="text" id="searchBox" placeholder="상품명 검색..." style="padding:8px 12px;border:1px solid #ccc;border-radius:6px;font-size:0.9rem;min-width:160px;">
+  <div style="position:relative;display:flex;align-items:center;">
+    <input type="text" id="searchBox" placeholder="상품명·카테고리·코드 검색..." style="padding:8px 36px 8px 12px;border:1px solid #ccc;border-radius:6px;font-size:0.9rem;width:230px;">
+    <button id="clearSearch" onclick="clearSearchBox()" style="position:absolute;right:8px;background:none;border:none;cursor:pointer;color:#aaa;font-size:1rem;display:none;">✕</button>
+  </div>
+  <button class="btn" id="btnAllDates" onclick="toggleAllDates()" title="전체 날짜에서 검색">전체기간</button>
   <label style="display:flex;align-items:center;gap:6px;font-size:0.9rem;cursor:pointer;white-space:nowrap;">
     <input type="checkbox" id="discountOnly" checked onchange="filterItems()" style="width:16px;height:16px;cursor:pointer;">
     할인상품만
@@ -107,24 +111,92 @@
 const datePicker = document.getElementById('datePicker');
 let currentView = 'table';
 let currentData = null;
+let allDatesMode = false;
+let searchDebounce = null;
+let currentQuery = '';
+
+// ── 한국어 초성 검색 ──
+const CHOSUNG = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+function getInitial(c) {
+  const n = c.charCodeAt(0);
+  return n >= 0xAC00 && n <= 0xD7A3 ? CHOSUNG[Math.floor((n - 0xAC00) / 588)] : c.toLowerCase();
+}
+function toInitials(s) { return [...s].map(getInitial).join(''); }
+function isAllChosung(s) { return s.length > 0 && [...s].every(c => CHOSUNG.includes(c)); }
+function searchMatch(q, ...fields) {
+  const qn = q.replace(/\s+/g, '').toLowerCase();
+  if (!qn) return true;
+  const cho = isAllChosung(qn);
+  return fields.some(f => {
+    if (f == null) return false;
+    const t = String(f).replace(/\s+/g, '').toLowerCase();
+    return cho ? toInitials(t).includes(qn) : t.includes(qn);
+  });
+}
+function highlight(text, q) {
+  if (!q || isAllChosung(q.replace(/\s+/g, ''))) return text;
+  const esc = q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text.replace(new RegExp(esc, 'gi'), m => `<mark style="background:#fff176;padding:0 1px;border-radius:2px;">${m}</mark>`);
+}
+
+function clearSearchBox() {
+  document.getElementById('searchBox').value = '';
+  document.getElementById('clearSearch').style.display = 'none';
+  filterItems();
+}
+
+function toggleAllDates() {
+  allDatesMode = !allDatesMode;
+  const btn = document.getElementById('btnAllDates');
+  btn.style.background = allDatesMode ? '#005daa' : '#f0f0f0';
+  btn.style.color = allDatesMode ? 'white' : '#555';
+  document.getElementById('datePicker').disabled = allDatesMode;
+  filterItems();
+}
 
 const DISCOUNT_TYPES = ['Double Discount', 'Clearance', 'Manufacturer Discount'];
 
 function getFilteredItems() {
   if (!currentData) return [];
-  const q = document.getElementById('searchBox').value.trim().toLowerCase();
+  const q = document.getElementById('searchBox').value.trim();
   const discountOnly = document.getElementById('discountOnly').checked;
   let items = currentData.items;
   if (discountOnly) items = items.filter(i => (i.discount_amount && i.discount_amount > 0) || DISCOUNT_TYPES.includes(i.price_tag_type));
-  if (q) items = items.filter(i => i.item_name.toLowerCase().includes(q));
+  if (q) items = items.filter(i => searchMatch(q, i.item_name, i.category, i.item_id));
   return items;
 }
 
 function filterItems() {
+  const q = document.getElementById('searchBox').value.trim();
+  currentQuery = q;
+  document.getElementById('clearSearch').style.display = q ? 'block' : 'none';
+
+  if (allDatesMode && q.length >= 1) {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => searchAllDates(q), 400);
+    return;
+  }
   if (!currentData) return;
   const items = getFilteredItems();
   const filtered = { ...currentData, items, count: items.length };
   renderItems(filtered);
+}
+
+async function searchAllDates(q) {
+  document.getElementById('content').className = 'loading';
+  document.getElementById('content').textContent = '전체 기간 검색 중...';
+  document.getElementById('summary').textContent = '';
+  try {
+    const res = await fetch(`/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const discountOnly = document.getElementById('discountOnly').checked;
+    let items = data.items || [];
+    if (discountOnly) items = items.filter(i => (i.discount_amount && i.discount_amount > 0) || DISCOUNT_TYPES.includes(i.price_tag_type));
+    renderItems({ date: '전체 기간', items, count: items.length });
+  } catch(e) {
+    document.getElementById('content').innerHTML = `<div class="empty"><p>오류: ${e.message}</p></div>`;
+  }
 }
 
 async function copyAsTable() {
@@ -170,6 +242,7 @@ async function copyAsTable() {
   box.addEventListener('compositionstart', () => composing = true);
   box.addEventListener('compositionend', () => { composing = false; filterItems(); });
   box.addEventListener('input', () => { if (!composing) filterItems(); });
+  box.addEventListener('keydown', e => { if (e.key === 'Escape') clearSearchBox(); });
 })();
 
 const TAG_INFO = {
@@ -229,7 +302,7 @@ function renderCard(data) {
   content.innerHTML = data.items.map(item => `
     <div class="card" onclick="location.href='/item/${item.item_id}'" style="cursor:pointer;">
       <div class="card-header">
-        <div class="item-name">${item.item_name}</div>
+        <div class="item-name">${highlight(item.item_name, currentQuery)}</div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
           ${tagBadge(item.price_tag_type, false)}
           ${item.product_image_url ? `<img class="product-img" src="${item.product_image_url}" alt="${item.item_name}" loading="lazy" onerror="this.style.display='none'">` : ''}
@@ -269,7 +342,7 @@ function renderTable(data) {
       <tbody>
         ${data.items.map(item => `
         <tr onclick="location.href='/item/${item.item_id}'" style="cursor:pointer;">
-          <td>${item.item_name}</td>
+          <td>${highlight(item.item_name, currentQuery)}</td>
           <td class="price-cell">${formatPrice(item.sale_price)}</td>
           <td class="disc">${item.discount_amount ? '↓' + formatPrice(item.discount_amount) : ''}</td>
           <td>${categoryBadge(item.category)}</td>
