@@ -18,3 +18,11 @@ CREATE TABLE IF NOT EXISTS costco_items (
 -- 인덱스 생성
 CREATE INDEX IF NOT EXISTS idx_item_id ON costco_items(item_id);
 CREATE INDEX IF NOT EXISTS idx_discount_end ON costco_items(discount_end);
+CREATE INDEX IF NOT EXISTS idx_uploaded_at ON costco_items(uploaded_at);
+CREATE INDEX IF NOT EXISTS idx_item_id_idx ON costco_items(item_id, idx DESC);
+CREATE INDEX IF NOT EXISTS idx_discount_partial ON costco_items(item_id, idx DESC) WHERE discount_amount IS NOT NULL;
+
+-- 텍스트 검색 속도 향상 (trigram)
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_item_name_trgm ON costco_items USING GIN (item_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_category_trgm ON costco_items USING GIN (category gin_trgm_ops);

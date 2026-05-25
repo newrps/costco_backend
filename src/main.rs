@@ -89,6 +89,20 @@ async fn main() {
         .await
         .ok();
 
+    // 성능 인덱스 (기존 DB에도 적용)
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_uploaded_at ON costco_items(uploaded_at)")
+        .execute(&pool).await.ok();
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_item_id_idx ON costco_items(item_id, idx DESC)")
+        .execute(&pool).await.ok();
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_discount_partial ON costco_items(item_id, idx DESC) WHERE discount_amount IS NOT NULL")
+        .execute(&pool).await.ok();
+    sqlx::query("CREATE EXTENSION IF NOT EXISTS pg_trgm")
+        .execute(&pool).await.ok();
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_item_name_trgm ON costco_items USING GIN (item_name gin_trgm_ops)")
+        .execute(&pool).await.ok();
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_category_trgm ON costco_items USING GIN (category gin_trgm_ops)")
+        .execute(&pool).await.ok();
+
     let shared_state = Arc::new(AppState {
         db: pool,
         gemini_api_key,
@@ -267,7 +281,8 @@ async fn items_handler(
                   idx, item_id, item_name, original_price, discount_amount, sale_price,
                   discount_start::text, discount_end::text, price_tag_type, stock_status, image_url, uploaded_at, product_image_url, category
            FROM costco_items
-           WHERE DATE(uploaded_at AT TIME ZONE 'Asia/Seoul') = $1::date
+           WHERE uploaded_at >= ($1::date::timestamp AT TIME ZONE 'Asia/Seoul')
+             AND uploaded_at <  (($1::date + 1)::timestamp AT TIME ZONE 'Asia/Seoul')
            ORDER BY item_id, idx DESC"#,
     )
     .bind(&date)
@@ -499,7 +514,8 @@ async fn process_image(
                 discount_start = $6, discount_end = $7, price_tag_type = $8, stock_status = $9,
                 image_url = $10, uploaded_at = $11, product_image_url = $12, category = $13
             WHERE item_id = $1
-              AND DATE(uploaded_at AT TIME ZONE 'Asia/Seoul') = DATE($11 AT TIME ZONE 'Asia/Seoul')
+              AND uploaded_at >= (DATE($11 AT TIME ZONE 'Asia/Seoul')::timestamp AT TIME ZONE 'Asia/Seoul')
+              AND uploaded_at <  ((DATE($11 AT TIME ZONE 'Asia/Seoul') + 1)::timestamp AT TIME ZONE 'Asia/Seoul')
             "#,
         )
         .bind(&item.item_id)
