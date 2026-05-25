@@ -624,14 +624,19 @@ async fn analyze_with_gemini(api_key: &str, image_data: &[u8]) -> Result<Vec<Ana
 
     let prompt = "You are a professional Costco price tag analyzer.
 Analyze the provided image and extract information for ALL price tags visible.
+
+CRITICAL RULE: Each price tag is an INDEPENDENT unit. Never mix fields from different tags.
+The item_name, item_id, prices, and dates printed on one physical tag MUST all come from that same tag only.
+If you see two tags (e.g. 삼양 불닭볶음면 and 까르보 불닭볶음면), each tag's price, item_id, and dates must come exclusively from that tag — do NOT cross-reference or combine data between tags.
+
 Return a JSON array of objects with these fields:
 1. item_name: Product name exactly as written on the price tag in Korean. Do NOT translate or append English. Include specs shown on the name line (e.g. weight, size).
-2. item_id: 6-7 digit product number.
-3. original_price: Integer (if visible).
-4. discount_amount: Integer (if visible).
-5. sale_price: Final price as integer.
-6. discount_start: YYYY-MM-DD (if visible).
-7. discount_end: YYYY-MM-DD (if visible).
+2. item_id: 6-7 digit product number printed on THIS tag.
+3. original_price: Integer (if visible on THIS tag).
+4. discount_amount: Integer (if visible on THIS tag).
+5. sale_price: Final price as integer printed on THIS tag.
+6. discount_start: YYYY-MM-DD (if visible on THIS tag).
+7. discount_end: YYYY-MM-DD (if visible on THIS tag).
 8. price_tag_type based on last 2 digits of sale_price:
    - 'Normal' if ends in 90
    - 'Double Discount' if ends in 70 or 00
