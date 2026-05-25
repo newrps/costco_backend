@@ -11,7 +11,7 @@ use sqlx::{Pool, Postgres};
 use std::sync::Arc;
 use dotenvy::dotenv;
 use tokio::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Path as StdPath, PathBuf};
 use base64::{Engine as _, engine::general_purpose};
 use serde_json::{json, Value};
 
@@ -146,7 +146,7 @@ async fn watch_inbox_folder(state: Arc<AppState>) {
     .expect("Failed to create file watcher");
 
     watcher
-        .watch(Path::new(&state.inbox_path), RecursiveMode::NonRecursive)
+        .watch(StdPath::new(&state.inbox_path), RecursiveMode::NonRecursive)
         .expect("Failed to watch inbox folder");
 
     tracing::info!("Started watching inbox folder: {}", state.inbox_path);
@@ -208,7 +208,7 @@ async fn watch_inbox_folder(state: Arc<AppState>) {
                 "All {} attempts failed for {:?}: {}",
                 MAX_RETRIES, path, last_error
             );
-            let error_dest = Path::new(&state.error_path)
+            let error_dest = StdPath::new(&state.error_path)
                 .join(path.file_name().unwrap());
             if let Err(e) = fs::rename(&path, &error_dest).await {
                 tracing::error!("Failed to move to error folder: {}", e);
@@ -427,12 +427,12 @@ async fn process_image(
     let date_str = uploaded_at.format("%Y-%m-%d").to_string();
 
     // 날짜별 processed 폴더
-    let processed_date_dir = Path::new(&state.processed_path).join(&date_str);
+    let processed_date_dir = StdPath::new(&state.processed_path).join(&date_str);
     let processed_file_path = processed_date_dir.join(&file_name);
 
     // HTTP 업로드인 경우 storage에 임시 저장
     let temp_path = if source_path.is_none() {
-        let p = Path::new(&state.storage_path).join(&file_name);
+        let p = StdPath::new(&state.storage_path).join(&file_name);
         fs::write(&p, &file_data).await?;
         Some(p)
     } else {
