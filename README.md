@@ -30,6 +30,12 @@
 - inbox 폴더 감시: NAS 폴더에 파일 복사하면 자동 처리
 - 같은 날 동일 상품 재업로드 시 UPDATE (중복 방지)
 
+### 상품 사진 관리
+- 안드로이드 앱에서 분석 결과 1개짜리 항목에 "상품 사진 찍기" 버튼 노출
+- `POST /product-image` 로 업로드 → `storage/product_images/{item_id}.jpg` 에 저장
+- 해당 item_id의 모든 DB 레코드에 `product_image_url` 자동 업데이트
+- `GET /product-images/:filename` 으로 직접 서빙 (저작권 문제 없는 UGC 이미지)
+
 ### 공개/할인 페이지
 - 한국어 초성 검색 (`ㅂㄷ` → 불닭 등)
 - 즐겨찾기 (localStorage 저장, 필터 가능)
@@ -76,6 +82,8 @@
 | GET | `/item/:id` | 상품 상세 페이지 |
 | GET | `/item/:id/history` | 상품 가격 이력 (JSON) |
 | POST | `/upload` | 가격표 이미지 업로드 |
+| POST | `/product-image` | 상품 사진 업로드 (item_id 연결) |
+| GET | `/product-images/:filename` | 업로드된 상품 사진 서빙 |
 | GET | `/items?date=YYYY-MM-DD` | 날짜별 전체 상품 목록 |
 | GET | `/sale-items` | 할인 상품 목록 |
 | GET | `/search?q=검색어` | 전체기간 상품 검색 |

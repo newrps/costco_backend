@@ -8,6 +8,7 @@ storage/
   processed/
     2026-05-25/       ← DB 저장 성공 시 날짜 폴더로 이동
   error/              ← 3회 재시도 후 실패한 파일
+  product_images/     ← 앱에서 직접 찍어 올린 상품 사진 ({item_id}.jpg)
 ```
 
 ---
@@ -26,6 +27,7 @@ ssh -p 56822 newrps@192.168.123.110
 mkdir -p /volume1/docker/costco_backend/storage/inbox
 mkdir -p /volume1/docker/costco_backend/storage/processed
 mkdir -p /volume1/docker/costco_backend/storage/error
+mkdir -p /volume1/docker/costco_backend/storage/product_images
 ```
 
 ### 2. NAS에 .env 파일 생성
@@ -44,6 +46,8 @@ STORAGE_PATH=/app/storage
 INBOX_PATH=/app/storage/inbox
 PROCESSED_PATH=/app/storage/processed
 ERROR_PATH=/app/storage/error
+PRODUCT_IMAGES_PATH=/app/storage/product_images
+BASE_URL=https://zip.zam.kr
 PORT=3000
 ```
 
@@ -129,6 +133,7 @@ init.sql은 최초 컨테이너 생성 시에만 실행됨. 이미 DB가 있다�
 ALTER TABLE costco_items ADD COLUMN IF NOT EXISTS uploaded_at TIMESTAMPTZ;
 ALTER TABLE costco_items ADD COLUMN IF NOT EXISTS product_image_url TEXT;
 ALTER TABLE costco_items ADD COLUMN IF NOT EXISTS category TEXT;
+-- 상품 사진 컬럼은 product_image_url을 재사용 (별도 컬럼 없음)
 \q
 ```
 

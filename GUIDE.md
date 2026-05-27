@@ -77,7 +77,30 @@ cd /volume1/docker/costco_backend
 
 ---
 
-## 3. 가격표 등록 방법
+## 3. 상품 사진 등록
+
+앱에서 가격표 분석 결과가 **1개**일 때 "상품 사진 찍기" 버튼이 나타납니다.  
+버튼 탭 → 상품을 카메라로 향해 촬영 → 자동 업로드.
+
+### API 직접 호출
+```bash
+curl -X POST https://zip.zam.kr/product-image \
+  -F "item_id=1234567" \
+  -F "image=@/path/to/product.jpg"
+```
+
+**응답 예시**
+```json
+{ "status": "success", "image_url": "https://zip.zam.kr/product-images/1234567.jpg" }
+```
+
+- 저장 위치: `storage/product_images/{item_id}.jpg`
+- DB의 해당 item_id 모든 레코드에 `product_image_url` 자동 업데이트
+- 같은 item_id로 재업로드 시 파일 덮어쓰기 + DB 재업데이트
+
+---
+
+## 4. 가격표 등록 방법
 
 ### 방법 1 - 관리자 페이지에서 직접 업로드
 `http://192.168.123.110:3100/admin` → 파일 선택 후 업로드
@@ -108,7 +131,7 @@ scp -P 56822 photo.jpg newrps@192.168.123.110:/volume1/docker/costco_backend/sto
 
 ---
 
-## 4. 가격표 종류 (price_tag_type)
+## 5. 가격표 종류 (price_tag_type)
 
 | 끝 두 자리 | 종류 | 설명 |
 |-----------|------|------|
@@ -116,7 +139,7 @@ scp -P 56822 photo.jpg newrps@192.168.123.110:/volume1/docker/costco_backend/sto
 | .70 / .00 | Double Discount | 매니저 특별 할인 (재고 소진용 대폭 할인) |
 | .49 / .79 | Manufacturer Discount | 생산업체 프로모션 할인 |
 
-## 5. 재고 상태 (stock_status)
+## 6. 재고 상태 (stock_status)
 
 | 기호 | 상태 | 설명 |
 |------|------|------|
@@ -126,7 +149,7 @@ scp -P 56822 photo.jpg newrps@192.168.123.110:/volume1/docker/costco_backend/sto
 
 ---
 
-## 6. 로그 확인
+## 7. 로그 확인
 
 ```bash
 ssh -p 56822 newrps@192.168.123.110
@@ -140,7 +163,7 @@ ssh -p 56822 newrps@192.168.123.110
 
 ---
 
-## 7. DB 직접 조회/관리
+## 8. DB 직접 조회/관리
 
 ```bash
 ssh -p 56822 newrps@192.168.123.110
@@ -170,7 +193,7 @@ TRUNCATE TABLE costco_items;
 
 ---
 
-## 8. 서비스 재시작 / 중지
+## 9. 서비스 재시작 / 중지
 
 ```bash
 ssh -p 56822 newrps@192.168.123.110
@@ -191,7 +214,7 @@ cd /volume1/docker/costco_backend
 
 ---
 
-## 9. 자주 발생하는 문제
+## 10. 자주 발생하는 문제
 
 ### Gemini API 오류: 모델 deprecated
 ```

@@ -31,7 +31,7 @@ if (-not $SkipGit) {
   if ($status) {
     $msg = if ($Message) { $Message } else { "update $(Get-Date -Format 'yyyy-MM-dd HH:mm')" }
     Write-Host "[git] 커밋: $msg" -ForegroundColor Cyan
-    git add src/ Cargo.toml Cargo.lock docker-compose.yml init.sql push-deploy.ps1 GUIDE.md .gitignore 2>$null
+    git add src/ Cargo.toml Cargo.lock docker-compose.yml init.sql push-deploy.ps1 GUIDE.md README.md DEPLOY.md .gitignore 2>$null
     git commit -m $msg 2>$null | Out-Null
   } else {
     Write-Host "[git] 변경사항 없음" -ForegroundColor DarkGray

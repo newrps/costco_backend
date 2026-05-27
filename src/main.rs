@@ -1,6 +1,7 @@
 use axum::{
+    body::Body,
     extract::{DefaultBodyLimit, Multipart, Path, Query, State},
-    response::Html,
+    response::{Html, Response},
     routing::{get, post},
     Json, Router,
 };
@@ -50,6 +51,8 @@ struct AppState {
     processed_path: String,
     inbox_path: String,
     error_path: String,
+    product_images_path: String,
+    base_url: String,
 }
 
 #[tokio::main]
@@ -68,11 +71,16 @@ async fn main() {
         .unwrap_or_else(|_| format!("{}/inbox", storage_path));
     let error_path = std::env::var("ERROR_PATH")
         .unwrap_or_else(|_| format!("{}/error", storage_path));
+    let product_images_path = std::env::var("PRODUCT_IMAGES_PATH")
+        .unwrap_or_else(|_| format!("{}/product_images", storage_path));
+    let base_url = std::env::var("BASE_URL")
+        .unwrap_or_else(|_| "https://zip.zam.kr".to_string());
 
     fs::create_dir_all(&storage_path).await.expect("Failed to create storage directory");
     fs::create_dir_all(&processed_path).await.expect("Failed to create processed directory");
     fs::create_dir_all(&inbox_path).await.expect("Failed to create inbox directory");
     fs::create_dir_all(&error_path).await.expect("Failed to create error directory");
+    fs::create_dir_all(&product_images_path).await.expect("Failed to create product_images directory");
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
@@ -110,6 +118,8 @@ async fn main() {
         processed_path,
         inbox_path: inbox_path.clone(),
         error_path,
+        product_images_path,
+        base_url,
     });
 
     // 폴더 감시 태스크 시작
@@ -127,6 +137,8 @@ async fn main() {
         .route("/item/:item_id/history", get(item_history_handler))
         .route("/search", get(search_handler))
         .route("/upload", post(upload_handler))
+        .route("/product-image", post(product_image_handler))
+        .route("/product-images/:filename", get(serve_product_image_handler))
         .route("/items", get(items_handler))
         .route("/sale-items", get(sale_items_handler))
         .route("/", get(public_page_handler))
@@ -229,6 +241,80 @@ async fn watch_inbox_folder(state: Arc<AppState>) {
                 tracing::error!("Failed to move to error folder: {}", e);
             }
         });
+    }
+}
+
+// 상품 사진 업로드
+async fn product_image_handler(
+    State(state): State<Arc<AppState>>,
+    mut multipart: Multipart,
+) -> Json<serde_json::Value> {
+    let mut item_id = String::new();
+    let mut image_data = Vec::new();
+    let mut file_ext = "jpg".to_string();
+
+    while let Some(field) = multipart.next_field().await.unwrap() {
+        let name = field.name().unwrap_or("").to_string();
+        match name.as_str() {
+            "item_id" => {
+                item_id = field.text().await.unwrap_or_default().trim().to_string();
+            }
+            "image" => {
+                let fname = field.file_name().unwrap_or("image.jpg").to_string();
+                if let Some(ext) = fname.rsplit('.').next() {
+                    file_ext = ext.to_lowercase();
+                }
+                image_data = field.bytes().await.unwrap_or_default().to_vec();
+            }
+            _ => {}
+        }
+    }
+
+    if item_id.is_empty() || image_data.is_empty() {
+        return Json(json!({ "error": "item_id and image are required" }));
+    }
+
+    let filename = format!("{}.{}", item_id, file_ext);
+    let file_path = StdPath::new(&state.product_images_path).join(&filename);
+
+    if let Err(e) = fs::write(&file_path, &image_data).await {
+        return Json(json!({ "error": format!("Failed to save image: {}", e) }));
+    }
+
+    let image_url = format!("{}/product-images/{}", state.base_url, filename);
+
+    let _ = sqlx::query("UPDATE costco_items SET product_image_url = $1 WHERE item_id = $2")
+        .bind(&image_url)
+        .bind(&item_id)
+        .execute(&state.db)
+        .await;
+
+    tracing::info!("Product image saved for item_id={}: {}", item_id, image_url);
+    Json(json!({ "status": "success", "image_url": image_url }))
+}
+
+// 상품 사진 서빙
+async fn serve_product_image_handler(
+    State(state): State<Arc<AppState>>,
+    Path(filename): Path<String>,
+) -> Response {
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        return Response::builder().status(400).body(Body::empty()).unwrap();
+    }
+
+    let file_path = StdPath::new(&state.product_images_path).join(&filename);
+
+    match fs::read(&file_path).await {
+        Ok(data) => {
+            let content_type = if filename.ends_with(".png") { "image/png" }
+                else if filename.ends_with(".webp") { "image/webp" }
+                else { "image/jpeg" };
+            Response::builder()
+                .header(axum::http::header::CONTENT_TYPE, content_type)
+                .body(Body::from(data))
+                .unwrap()
+        }
+        Err(_) => Response::builder().status(404).body(Body::from("Not found")).unwrap(),
     }
 }
 
