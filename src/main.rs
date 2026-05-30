@@ -1,6 +1,8 @@
 use axum::{
     body::Body,
     extract::{DefaultBodyLimit, Multipart, Path, Query, State},
+    http::{Request, StatusCode},
+    middleware::{self, Next},
     response::{Html, Response},
     routing::{get, post},
     Json, Router,
@@ -53,6 +55,7 @@ struct AppState {
     error_path: String,
     product_images_path: String,
     base_url: String,
+    admin_password: String,
 }
 
 #[tokio::main]
@@ -75,6 +78,7 @@ async fn main() {
         .unwrap_or_else(|_| format!("{}/product_images", storage_path));
     let base_url = std::env::var("BASE_URL")
         .unwrap_or_else(|_| "https://zip.zam.kr".to_string());
+    let admin_password = std::env::var("ADMIN_PASSWORD").expect("ADMIN_PASSWORD must be set");
 
     fs::create_dir_all(&storage_path).await.expect("Failed to create storage directory");
     fs::create_dir_all(&processed_path).await.expect("Failed to create processed directory");
@@ -120,6 +124,7 @@ async fn main() {
         error_path,
         product_images_path,
         base_url,
+        admin_password,
     });
 
     // 폴더 감시 태스크 시작
@@ -128,6 +133,12 @@ async fn main() {
         watch_inbox_folder(watcher_state).await;
     });
 
+    let admin_routes = Router::new()
+        .route("/admin", get(admin_page_handler))
+        .route("/items", get(items_handler))
+        .route("/search", get(search_handler))
+        .layer(middleware::from_fn_with_state(shared_state.clone(), basic_auth_middleware));
+
     let app = Router::new()
         .route("/health", get(|| async { "OK" }))
         .route("/favicon.ico", get(favicon_handler))
@@ -135,15 +146,13 @@ async fn main() {
         .route("/og-image.png", get(og_image_handler))
         .route("/item/:item_id", get(item_page_handler))
         .route("/item/:item_id/history", get(item_history_handler))
-        .route("/search", get(search_handler))
         .route("/upload", post(upload_handler))
         .route("/product-image", post(product_image_handler))
         .route("/product-images/:filename", get(serve_product_image_handler))
-        .route("/items", get(items_handler))
         .route("/sale-items", get(sale_items_handler))
         .route("/", get(public_page_handler))
-        .route("/admin", get(admin_page_handler))
         .route("/sale", get(sale_page_handler))
+        .merge(admin_routes)
         .layer(DefaultBodyLimit::max(20 * 1024 * 1024))
         .with_state(shared_state);
 
@@ -152,6 +161,37 @@ async fn main() {
     tracing::info!("listening on {}", listener.local_addr().unwrap());
     tracing::info!("inbox folder watching: {}", inbox_path);
     axum::serve(listener, app).await.unwrap();
+}
+
+async fn basic_auth_middleware(
+    State(state): State<Arc<AppState>>,
+    request: Request<Body>,
+    next: Next,
+) -> Result<Response, Response> {
+    let authorized = request
+        .headers()
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Basic "))
+        .and_then(|encoded| general_purpose::STANDARD.decode(encoded).ok())
+        .and_then(|decoded| String::from_utf8(decoded).ok())
+        .map(|creds| {
+            let mut parts = creds.splitn(2, ':');
+            let user = parts.next().unwrap_or("");
+            let pass = parts.next().unwrap_or("");
+            user == "admin" && pass == state.admin_password
+        })
+        .unwrap_or(false);
+
+    if authorized {
+        Ok(next.run(request).await)
+    } else {
+        Err(Response::builder()
+            .status(StatusCode::UNAUTHORIZED)
+            .header("WWW-Authenticate", "Basic realm=\"Costco Admin\"")
+            .body(Body::from("Unauthorized"))
+            .unwrap())
+    }
 }
 
 // inbox 폴더를 감시하다가 새 파일이 생기면 자동 처리
