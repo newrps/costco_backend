@@ -852,10 +852,17 @@ Respond ONLY with a valid JSON array. If nothing found, return [].";
         let json_str = text.trim_matches(|c| c == '`' || c == '\n' || c == ' ');
         let json_str = if json_str.starts_with("json") { &json_str[4..] } else { json_str };
 
-        let results: Vec<AnalysisResult> = serde_json::from_str(json_str).map_err(|e| {
+        let mut results: Vec<AnalysisResult> = serde_json::from_str(json_str).map_err(|e| {
             tracing::error!("JSON parse error: {} — raw: {}", e, &json_str[..json_str.len().min(300)]);
             e
         })?;
+        for item in &mut results {
+            item.stock_status = match item.stock_status.trim() {
+                "+" => "In Stock".to_string(),
+                "*" => "Last Chance".to_string(),
+                _ => item.stock_status.clone(),
+            };
+        }
         tracing::info!("Gemini parsed {} items", results.len());
         return Ok(results);
     }
