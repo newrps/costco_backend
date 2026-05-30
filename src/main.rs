@@ -55,6 +55,7 @@ struct AppState {
     error_path: String,
     product_images_path: String,
     base_url: String,
+    admin_username: String,
     admin_password: String,
 }
 
@@ -78,6 +79,7 @@ async fn main() {
         .unwrap_or_else(|_| format!("{}/product_images", storage_path));
     let base_url = std::env::var("BASE_URL")
         .unwrap_or_else(|_| "https://zip.zam.kr".to_string());
+    let admin_username = std::env::var("ADMIN_USERNAME").expect("ADMIN_USERNAME must be set");
     let admin_password = std::env::var("ADMIN_PASSWORD").expect("ADMIN_PASSWORD must be set");
 
     fs::create_dir_all(&storage_path).await.expect("Failed to create storage directory");
@@ -124,6 +126,7 @@ async fn main() {
         error_path,
         product_images_path,
         base_url,
+        admin_username,
         admin_password,
     });
 
@@ -179,7 +182,7 @@ async fn basic_auth_middleware(
             let mut parts = creds.splitn(2, ':');
             let user = parts.next().unwrap_or("");
             let pass = parts.next().unwrap_or("");
-            user == "admin" && pass == state.admin_password
+            user == state.admin_username && pass == state.admin_password
         })
         .unwrap_or(false);
 
