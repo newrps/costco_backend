@@ -40,7 +40,7 @@ nano /volume1/docker/costco_backend/.env
 
 내용:
 ```
-DATABASE_URL=postgres://newrps:Pspspsps1234!!@db:5432/costco_db
+DATABASE_URL=postgres://newrps:your_password@db:5432/costco_db
 GEMINI_API_KEY=여기에_Gemini_API_키_입력
 STORAGE_PATH=/app/storage
 INBOX_PATH=/app/storage/inbox
